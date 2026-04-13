@@ -43,6 +43,11 @@ Targeting **gold**.
 
 Posts automatically print on a thermal receipt printer via Bluetooth. Classmates can post through a web interface.
 
+<p align="center">
+  <img src="printer.jpg" alt="MXW01 thermal printer with BBS posts" width="400">
+</p>
+<p align="center"><em>The MXW01 printer with QR code, posts with emoji flair, and that classic BBS feel.</em></p>
+
 ### Setup
 1. Turn on the MXW01 thermal printer
 2. Make sure it's paired with your laptop via Bluetooth
