@@ -1,0 +1,57 @@
+[
+  {
+    "username": "Hannah",
+    "message": "hello",
+    "timestamp": "2026-04-12T21:16:13.693376"
+  },
+  {
+    "username": "Hannah",
+    "message": "just finished my database assignment",
+    "timestamp": "2026-04-12T21:16:42.443437"
+  },
+  {
+    "username": "Hannah",
+    "message": "SQL is way faster than scanning JSON files",
+    "timestamp": "2026-04-12T21:16:42.489701"
+  },
+  {
+    "username": "Hannah",
+    "message": "time for a coffee break",
+    "timestamp": "2026-04-12T21:16:42.536221"
+  },
+  {
+    "username": "Hannah",
+    "message": "hello",
+    "timestamp": "2026-04-13T13:10:59.095185"
+  },
+  {
+    "username": "Hannah",
+    "message": "hello",
+    "timestamp": "2026-04-13T13:10:59.143932"
+  },
+  {
+    "username": "Hannah",
+    "message": "hello",
+    "timestamp": "2026-04-13T13:10:59.190928"
+  },
+  {
+    "username": "Hannah",
+    "message": "Hello",
+    "timestamp": "2026-04-13T13:29:19.414106"
+  },
+  {
+    "username": "Bob",
+    "message": "Hello",
+    "timestamp": "2026-04-13T13:29:19.460626"
+  },
+  {
+    "username": "Hannah",
+    "message": "Hi",
+    "timestamp": "2026-04-13T13:29:19.505309"
+  },
+  {
+    "username": "Hannah",
+    "message": "Hi",
+    "timestamp": "2026-04-13T13:29:19.549526"
+  }
+]
