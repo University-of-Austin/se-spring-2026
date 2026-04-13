@@ -104,7 +104,6 @@ def read_posts(board=None):
     posts = load_posts()
     if board:
         posts = [p for p in posts if p.get("board", "general") == board]
-    if board:
         print_section_header(f"Board: {board}")
     else:
         print_welcome()
@@ -165,10 +164,8 @@ def show_profile(username):
 
 
 def set_bio(username, bio_text):
+    get_or_create_user(username)
     users = load_users()
-    if username not in users:
-        get_or_create_user(username)
-        users = load_users()
     users[username]["bio"] = bio_text
     save_users(users)
     print(fmt_info("Bio updated."))

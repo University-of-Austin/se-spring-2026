@@ -76,29 +76,20 @@ def format_timestamp(ts):
 
 
 def read_posts(board_name=None):
+    query = (
+        "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to "
+        "FROM posts p "
+        "JOIN users u ON p.user_id = u.id "
+        "JOIN boards b ON p.board_id = b.id "
+    )
+    params = {}
+    if board_name:
+        query += "WHERE b.name = :board "
+        params["board"] = board_name
+    query += "ORDER BY p.id"
+
     with engine.connect() as conn:
-        if board_name:
-            rows = conn.execute(
-                text(
-                    "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to "
-                    "FROM posts p "
-                    "JOIN users u ON p.user_id = u.id "
-                    "JOIN boards b ON p.board_id = b.id "
-                    "WHERE b.name = :board "
-                    "ORDER BY p.id"
-                ),
-                {"board": board_name},
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                text(
-                    "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to "
-                    "FROM posts p "
-                    "JOIN users u ON p.user_id = u.id "
-                    "JOIN boards b ON p.board_id = b.id "
-                    "ORDER BY p.id"
-                )
-            ).fetchall()
+        rows = conn.execute(text(query), params).fetchall()
 
     if board_name:
         print_section_header(f"Board: {board_name}")
@@ -270,23 +261,10 @@ def export_db(filepath):
     print(fmt_info(f"Exported {len(posts)} posts and {len(users)} users to {filepath}"))
 
 
-def import_db(filepath):
-    try:
-        with open(filepath, "r") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        print(fmt_error(f"{filepath} not found."))
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(fmt_error(f"{filepath} is not valid JSON."))
-        sys.exit(1)
-
-    posts = data.get("posts", [])
-    user_profiles = data.get("users", {})
-
-    if not posts:
-        print(fmt_info("No posts to import."))
-        return
+def bulk_insert(posts, user_profiles=None):
+    """Insert posts into DB, skipping duplicates. Returns (added, skipped, new_users, new_boards) counts."""
+    if user_profiles is None:
+        user_profiles = {}
 
     posts_added = 0
     posts_skipped = 0
@@ -294,7 +272,6 @@ def import_db(filepath):
     boards_added = 0
 
     with engine.begin() as conn:
-        # Get or create users
         usernames = sorted(set(p["username"] for p in posts))
         user_id_map = {}
         for username in usernames:
@@ -315,7 +292,6 @@ def import_db(filepath):
                 user_id_map[username] = result.lastrowid
                 users_added += 1
 
-        # Get or create boards
         board_names = sorted(set(p.get("board", "general") for p in posts))
         board_id_map = {}
         for board_name in board_names:
@@ -333,7 +309,6 @@ def import_db(filepath):
                 board_id_map[board_name] = result.lastrowid
                 boards_added += 1
 
-        # Insert posts, skip duplicates
         old_to_new = {}
         for p in posts:
             board = p.get("board", "general")
@@ -345,11 +320,7 @@ def import_db(filepath):
                     "AND p.message = :message "
                     "AND p.timestamp = :timestamp"
                 ),
-                {
-                    "username": p["username"],
-                    "message": p["message"],
-                    "timestamp": p["timestamp"],
-                },
+                {"username": p["username"], "message": p["message"], "timestamp": p["timestamp"]},
             ).fetchone()
 
             if existing:
@@ -380,9 +351,31 @@ def import_db(filepath):
                 old_to_new[old_id] = result.lastrowid
             posts_added += 1
 
-    print(fmt_info(f"Import complete: {posts_added} posts added, {posts_skipped} skipped (already exist)."))
-    print(fmt_info(f"  Users: {users_added} new, {len(usernames) - users_added} existing"))
-    print(fmt_info(f"  Boards: {boards_added} new, {len(board_names) - boards_added} existing"))
+    return posts_added, posts_skipped, users_added, len(usernames) - users_added, boards_added, len(board_names) - boards_added
+
+
+def import_db(filepath):
+    try:
+        with open(filepath, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(fmt_error(f"{filepath} not found."))
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(fmt_error(f"{filepath} is not valid JSON."))
+        sys.exit(1)
+
+    posts = data.get("posts", [])
+    user_profiles = data.get("users", {})
+
+    if not posts:
+        print(fmt_info("No posts to import."))
+        return
+
+    added, skipped, new_users, existing_users, new_boards, existing_boards = bulk_insert(posts, user_profiles)
+    print(fmt_info(f"Import complete: {added} posts added, {skipped} skipped (already exist)."))
+    print(fmt_info(f"  Users: {new_users} new, {existing_users} existing"))
+    print(fmt_info(f"  Boards: {new_boards} new, {existing_boards} existing"))
 
 
 def main():

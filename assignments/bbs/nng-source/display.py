@@ -7,7 +7,6 @@ BOLD = "\033[1m"
 DIM = "\033[2m"
 
 # Foreground colors
-RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 BLUE = "\033[34m"
@@ -193,9 +192,7 @@ def print_profile(username, joined, post_count, bio):
     print(f"  {c('User:', DIM)}    {c(username, BOLD, user_color(username))}")
     print(f"  {c('Joined:', DIM)}  {c(joined, WHITE)}")
     print(f"  {c('Posts:', DIM)}   {c(str(post_count), BRIGHT_YELLOW)}")
-    bio_display = bio if bio else c("(no bio set)", DIM)
-    if bio:
-        bio_display = c(bio, WHITE)
+    bio_display = c(bio, WHITE) if bio else c("(no bio set)", DIM)
     print(f"  {c('Bio:', DIM)}     {bio_display}")
     print(sep)
 
