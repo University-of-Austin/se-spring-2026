@@ -37,7 +37,27 @@ uv run pytest
 
 ## Tier
 
-Targeting **bronze**.
+Targeting **gold**.
+
+## Gold Feature: Thermal Printer Integration
+
+Posts automatically print on a thermal receipt printer via Bluetooth. Classmates can post through a web interface.
+
+### Setup
+1. Turn on the MXW01 thermal printer
+2. Make sure it's paired with your laptop via Bluetooth
+
+### Running the Web Interface
+```bash
+uv run python web.py
+```
+This starts a local web server. Classmates on the same WiFi can visit the URL shown to post messages. Each post saves to the database and prints immediately.
+
+### Printing a QR Code
+```bash
+uv run python print_qr.py
+```
+Prints a QR code that classmates can scan to open the web form.
 
 ## Search Comparison: JSON vs SQL
 

@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import text
 
 from db import engine, init_db
+from printer import print_post
 
 
 def main():
@@ -84,7 +85,7 @@ def get_or_create_user(conn, username: str) -> int:
 
 
 def post_message(username: str, message: str):
-    """Post a new message to the board."""
+    """Post a new message to the board and print it."""
     with engine.connect() as conn:
         # Step 1: Get the user's ID (creating them if needed)
         user_id = get_or_create_user(conn, username)
@@ -101,6 +102,10 @@ def post_message(username: str, message: str):
         conn.commit()
 
     print("Posted.")
+
+    # Print to thermal printer (non-blocking, won't fail if printer unavailable)
+    formatted_time = datetime.fromisoformat(timestamp).strftime("%Y-%m-%d %H:%M")
+    print_post(username, message, formatted_time)
 
 
 def read_messages():
