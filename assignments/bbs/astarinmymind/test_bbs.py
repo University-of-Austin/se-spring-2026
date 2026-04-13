@@ -192,3 +192,110 @@ class TestPartBSearch:
     def test_no_results_returns_empty(self, seeded_db):
         output = run_command(["bbs_db.py", "search", "nonexistent"])
         assert output.strip() == ""
+
+
+# === Part C Tests (Migration) ===
+
+@pytest.fixture
+def migration_setup(clean_json, clean_db):
+    """Set up JSON with test data, ensure no database exists."""
+    run_command(["bbs.py", "post", "fwd_deployed", "Every student says they're going for gold."])
+    run_command(["bbs.py", "post", "dean_of_stem", "And every student learns what scope creep means by Sunday night."])
+    run_command(["bbs.py", "post", "pierce", "Myles and I are going for gold together. Accountability buddy system."])
+    run_command(["bbs.py", "post", "myles", "Pierce has mass texted me 47 times today."])
+    run_command(["bbs.py", "post", "pierce", "48. Just sent another one."])
+    run_command(["bbs.py", "post", "myles", "I'm turning off my phone."])
+    yield
+
+
+class TestMigration:
+    def test_creates_database(self, migration_setup):
+        """Migration should create bbs.db file."""
+        run_command(["migrate.py"])
+        assert os.path.exists("bbs.db")
+
+    def test_creates_users_from_json(self, migration_setup):
+        """Each unique username should become a row in users table."""
+        run_command(["migrate.py"])
+        output = run_command(["bbs_db.py", "users"])
+        lines = output.strip().split("\n")
+        assert "fwd_deployed" in lines
+        assert "dean_of_stem" in lines
+        assert "pierce" in lines
+        assert "myles" in lines
+        assert len(lines) == 4
+
+    def test_handles_duplicate_usernames(self, migration_setup):
+        """Users who post multiple times should only appear once in users table."""
+        run_command(["migrate.py"])
+        output = run_command(["bbs_db.py", "users"])
+        # pierce and myles each post twice, but should only appear once
+        assert output.count("pierce") == 1
+        assert output.count("myles") == 1
+
+    def test_creates_posts_from_json(self, migration_setup):
+        """Each post should be migrated to the database."""
+        run_command(["migrate.py"])
+        output = run_command(["bbs_db.py", "read"])
+        assert "Every student says they're going for gold." in output
+        assert "And every student learns what scope creep means by Sunday night." in output
+        assert "Accountability buddy system." in output
+        assert "47 times today." in output
+        assert "48. Just sent another one." in output
+        assert "turning off my phone." in output
+
+    def test_output_matches_after_migration(self, migration_setup):
+        """bbs_db.py read should produce identical output to bbs.py read."""
+        json_output = run_command(["bbs.py", "read"])
+        run_command(["migrate.py"])
+        db_output = run_command(["bbs_db.py", "read"])
+        assert json_output == db_output
+
+    def test_errors_if_db_exists(self, migration_setup):
+        """Migration should fail if bbs.db already exists."""
+        run_command(["migrate.py"])  # First migration succeeds
+        result = subprocess.run(
+            ["uv", "run", "python", "migrate.py"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode != 0
+        combined_output = result.stderr + result.stdout
+        assert "bbs.db already exists" in combined_output
+        assert "--force" in combined_output
+
+    def test_force_flag_overwrites(self, migration_setup):
+        """--force flag should allow overwriting existing database."""
+        run_command(["migrate.py"])  # First migration
+        result = subprocess.run(
+            ["uv", "run", "python", "migrate.py", "--force"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert "Migrated" in result.stdout
+
+    def test_empty_json_creates_empty_db(self, clean_json, clean_db):
+        """Migration with no posts should create database with empty tables."""
+        # Create empty bbs.json (no posts)
+        with open("bbs.json", "w") as f:
+            f.write("[]")
+        run_command(["migrate.py"])
+        assert os.path.exists("bbs.db")
+        output = run_command(["bbs_db.py", "read"])
+        assert output.strip() == ""
+
+    def test_missing_json_errors(self, clean_db):
+        """Migration should fail with clear message if bbs.json doesn't exist."""
+        # Explicitly ensure bbs.json doesn't exist
+        if os.path.exists("bbs.json"):
+            os.remove("bbs.json")
+
+        result = subprocess.run(
+            ["uv", "run", "python", "migrate.py"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode != 0
+        combined_output = result.stderr + result.stdout
+        assert "bbs.json not found" in combined_output
