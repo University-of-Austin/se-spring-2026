@@ -61,6 +61,47 @@ def search(keyword):
         print(f"[{r[0]}] {r[1]}: {r[2]}")
 
 
+def profile(username):
+    with engine.connect() as conn:
+        user_row = conn.execute(
+            text("SELECT id, bio FROM users WHERE username = :username"),
+            {"username": username}
+        ).fetchone()
+        if user_row is None:
+            print(f"No user named {username}.")
+            return
+        user_id, bio = user_row[0], user_row[1]
+        stats = conn.execute(
+            text(
+                "SELECT MIN(timestamp), COUNT(*) FROM posts "
+                "WHERE user_id = :user_id"
+            ),
+            {"user_id": user_id}
+        ).fetchone()
+        joined, count = stats[0], stats[1]
+
+    print(f"Username: {username}")
+    print(f"Joined: {joined if joined else '(no posts yet)'}")
+    print(f"Messages: {count}")
+    print(f"Bio: {bio if bio else '(no bio set)'}")
+
+
+def set_bio(username, bio):
+    with engine.begin() as conn:
+        user_row = conn.execute(
+            text("SELECT id FROM users WHERE username = :username"),
+            {"username": username}
+        ).fetchone()
+        if user_row is None:
+            print(f"No user named {username}. Post a message first to create the account.")
+            return
+        conn.execute(
+            text("UPDATE users SET bio = :bio WHERE username = :username"),
+            {"bio": bio, "username": username}
+        )
+    print("Bio updated.")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python bbs_db.py <command> [args]")
@@ -82,6 +123,16 @@ if __name__ == "__main__":
             print("Usage: python bbs_db.py search <keyword>")
             sys.exit(1)
         search(sys.argv[2])
+    elif command == "profile":
+        if len(sys.argv) < 3:
+            print("Usage: python bbs_db.py profile <username>")
+            sys.exit(1)
+        profile(sys.argv[2])
+    elif command == "set_bio":
+        if len(sys.argv) < 4:
+            print("Usage: python bbs_db.py set_bio <username> <message>")
+            sys.exit(1)
+        set_bio(sys.argv[2], " ".join(sys.argv[3:]))
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
