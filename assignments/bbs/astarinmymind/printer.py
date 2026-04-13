@@ -54,6 +54,12 @@ def text_to_bitmap(text: str, font_size: int = 20) -> list[bytes]:
     except OSError:
         font = ImageFont.load_default()
 
+    # Try to load emoji font for emoji characters
+    try:
+        emoji_font = ImageFont.truetype("/System/Library/Fonts/Apple Color Emoji.ttc", font_size)
+    except OSError:
+        emoji_font = None
+
     # Handle multi-line text by wrapping
     lines = wrap_text(text, font, PRINTER_WIDTH - 20)
 
@@ -61,15 +67,31 @@ def text_to_bitmap(text: str, font_size: int = 20) -> list[bytes]:
     line_height = font_size
     total_height = len(lines) * line_height + 2
 
-    # Create image (white background)
-    img = Image.new("1", (PRINTER_WIDTH, total_height), 1)
+    # Create RGBA image to support emoji (white background)
+    img = Image.new("RGBA", (PRINTER_WIDTH, total_height), (255, 255, 255, 255))
     draw = ImageDraw.Draw(img)
 
-    # Draw each line
+    # Draw each line, handling emoji separately
     y = 1
     for line in lines:
-        draw.text((10, y), line, font=font, fill=0)
+        x = 10
+        for char in line:
+            # Check if character is emoji (outside basic ASCII/Latin)
+            if ord(char) > 0x1F00 and emoji_font:
+                try:
+                    draw.text((x, y), char, font=emoji_font, fill=(0, 0, 0, 255), embedded_color=True)
+                    bbox = draw.textbbox((x, y), char, font=emoji_font)
+                except Exception:
+                    draw.text((x, y), char, font=font, fill=(0, 0, 0, 255))
+                    bbox = draw.textbbox((x, y), char, font=font)
+            else:
+                draw.text((x, y), char, font=font, fill=(0, 0, 0, 255))
+                bbox = draw.textbbox((x, y), char, font=font)
+            x = bbox[2]  # Move to end of character
         y += line_height
+
+    # Convert to 1-bit bitmap (black pixels where any color is dark)
+    img = img.convert("L").point(lambda p: 0 if p < 200 else 255, "1")
 
     # Convert to bitmap rows (LSB first)
     rows = []

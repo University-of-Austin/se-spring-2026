@@ -65,8 +65,11 @@ def print_qr(url: str, label: str = "Scan to post"):
     print(f"Generating QR code for: {url}")
     rows = generate_qr_bitmap(url, label)
     print(f"Printing {len(rows)} rows...")
-    asyncio.run(_print_bitmap(rows))
-    print("Done!")
+    try:
+        asyncio.run(_print_bitmap(rows))
+        print("Done!")
+    except Exception as e:
+        print(f"Printer unavailable: {e}")
 
 
 if __name__ == "__main__":

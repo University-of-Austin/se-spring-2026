@@ -59,6 +59,33 @@ uv run python print_qr.py
 ```
 Prints a QR code that classmates can scan to open the web form.
 
+## Silver Feature: User Flair
+
+Users can set an emoji flair that appears next to their name on all posts.
+
+### Command Line
+```bash
+uv run python bbs_db.py flair <username> <emoji>
+```
+
+Example:
+```
+$ python bbs_db.py flair angela ⭐
+Flair set to ⭐ for angela.
+
+$ python bbs_db.py read
+[2026-04-13 11:30] angela ⭐: Hello everyone!
+```
+
+### Web Interface
+The web form includes an emoji picker. Users can select a flair when posting, and it gets saved to their profile.
+
+### Schema Change
+Added a `flair` column to the `users` table:
+```sql
+ALTER TABLE users ADD COLUMN flair TEXT
+```
+
 ## Search Comparison: JSON vs SQL
 
 In the JSON version, search loads the entire `bbs.json` file into memory, then loops through every post checking if the keyword exists in each message. This is O(n) where n is the number of posts, and requires loading all data regardless of how many matches exist.

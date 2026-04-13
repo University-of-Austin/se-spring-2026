@@ -26,6 +26,11 @@ HTML_TEMPLATE = """
         .error {{ color: red; margin-bottom: 20px; }}
         .counter {{ text-align: right; font-size: 14px; color: #666; }}
         .counter.over {{ color: red; }}
+        .flair-picker {{ display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }}
+        .flair-picker label {{ cursor: pointer; font-size: 24px; padding: 4px; border: 2px solid transparent; border-radius: 4px; }}
+        .flair-picker input {{ display: none; }}
+        .flair-picker input:checked + span {{ border: 2px solid #333; border-radius: 4px; }}
+        .flair-picker span {{ padding: 4px; display: inline-block; }}
     </style>
 </head>
 <body>
@@ -33,6 +38,13 @@ HTML_TEMPLATE = """
     {message}
     <form method="POST">
         <input name="username" placeholder="Your name" required maxlength="20">
+        <div class="flair-picker">
+            <label><input type="radio" name="flair" value="🐱" required><span>🐱</span></label>
+            <label><input type="radio" name="flair" value="🐶"><span>🐶</span></label>
+            <label><input type="radio" name="flair" value="🐰"><span>🐰</span></label>
+            <label><input type="radio" name="flair" value="🦄"><span>🦄</span></label>
+            <label><input type="radio" name="flair" value="🐮"><span>🐮</span></label>
+        </div>
         <textarea name="message" placeholder="Your message" rows="3" required maxlength="140" id="msg"></textarea>
         <div class="counter"><span id="count">0</span>/140</div>
         <button type="submit">Post</button>
@@ -71,6 +83,7 @@ def index():
     if request.method == "POST":
         username = request.form["username"].strip()
         msg = request.form["message"].strip()
+        flair = request.form.get("flair", "").strip()
 
         if len(username) > 20:
             return HTML_TEMPLATE.format(message='<p class="error">Name too long (max 20 chars)</p>')
@@ -81,6 +94,12 @@ def index():
         if username and msg:
             with engine.connect() as conn:
                 user_id = get_or_create_user(conn, username)
+                # Update flair if provided
+                if flair:
+                    conn.execute(
+                        text("UPDATE users SET flair = :flair WHERE id = :user_id"),
+                        {"flair": flair, "user_id": user_id}
+                    )
                 timestamp = datetime.now().isoformat(timespec="seconds")
                 conn.execute(
                     text("INSERT INTO posts (user_id, message, timestamp) VALUES (:user_id, :message, :timestamp)"),
@@ -88,9 +107,10 @@ def index():
                 )
                 conn.commit()
 
-            # Print it
+            # Print it with flair
             formatted_time = datetime.fromisoformat(timestamp).strftime("%Y-%m-%d %H:%M")
-            print_post(username, msg, formatted_time)
+            display_name = f"{username} {flair}" if flair else username
+            print_post(display_name, msg, formatted_time)
 
             message = '<p class="success">Posted!</p>'
 

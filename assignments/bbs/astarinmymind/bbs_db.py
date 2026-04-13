@@ -27,6 +27,7 @@ def main():
         print("  read                       - Read all messages")
         print("  users                      - List all users")
         print("  search <keyword>           - Search posts by keyword")
+        print("  flair <username> <emoji>   - Set user flair")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -52,6 +53,14 @@ def main():
             sys.exit(1)
         keyword = sys.argv[2]
         search_messages(keyword)
+
+    elif command == "flair":
+        if len(sys.argv) < 4:
+            print("Usage: python bbs_db.py flair <username> <emoji>")
+            sys.exit(1)
+        username = sys.argv[2]
+        emoji = sys.argv[3]
+        set_flair(username, emoji)
 
     else:
         print(f"Unknown command: {command}")
@@ -108,32 +117,51 @@ def post_message(username: str, message: str):
     print_post(username, message, formatted_time)
 
 
+def set_flair(username: str, emoji: str):
+    """Set a user's flair emoji."""
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("UPDATE users SET flair = :flair WHERE username = :username"),
+            {"flair": emoji, "username": username}
+        )
+        conn.commit()
+
+        if result.rowcount == 0:
+            print(f"User '{username}' not found.")
+        else:
+            print(f"Flair set to {emoji} for {username}.")
+
+
+def format_user(username: str, flair: str | None) -> str:
+    """Format username with optional flair."""
+    if flair:
+        return f"{username} {flair}"
+    return username
+
+
 def read_messages():
     """Read and display all messages."""
     with engine.connect() as conn:
-        # JOIN posts with users to get the username for each post
         result = conn.execute(text("""
-            SELECT u.username, p.message, p.timestamp
+            SELECT u.username, u.flair, p.message, p.timestamp
             FROM posts p
             JOIN users u ON p.user_id = u.id
             ORDER BY p.id
         """))
 
-        # Loop through results and format each post
         for row in result:
-            username, message, timestamp_str = row
-            # Parse ISO timestamp and format for display
+            username, flair, message, timestamp_str = row
             timestamp = datetime.fromisoformat(timestamp_str)
             formatted_time = timestamp.strftime("%Y-%m-%d %H:%M")
-            print(f"[{formatted_time}] {username}: {message}")
+            display_name = format_user(username, flair)
+            print(f"[{formatted_time}] {display_name}: {message}")
 
 
 def list_users():
-    """List all users who have posted, in order of first post."""
+    """List all users who have posted, alphabetically."""
     with engine.connect() as conn:
-        # Get unique users ordered by when they first posted
         result = conn.execute(text("""
-            SELECT u.username
+            SELECT u.username, u.flair
             FROM users u
             JOIN posts p ON u.id = p.user_id
             GROUP BY u.id
@@ -141,17 +169,16 @@ def list_users():
         """))
 
         for row in result:
-            print(row[0])
+            username, flair = row
+            print(format_user(username, flair))
 
 
 def search_messages(keyword: str):
     """Search posts containing a keyword. Database does the filtering."""
     with engine.connect() as conn:
-        # Use LIKE with % wildcards for pattern matching
-        # The :pattern is a parameterized query - safe from SQL injection
         result = conn.execute(
             text("""
-                SELECT u.username, p.message, p.timestamp
+                SELECT u.username, u.flair, p.message, p.timestamp
                 FROM posts p
                 JOIN users u ON p.user_id = u.id
                 WHERE p.message LIKE :pattern
@@ -161,10 +188,11 @@ def search_messages(keyword: str):
         )
 
         for row in result:
-            username, message, timestamp_str = row
+            username, flair, message, timestamp_str = row
             timestamp = datetime.fromisoformat(timestamp_str)
             formatted_time = timestamp.strftime("%Y-%m-%d %H:%M")
-            print(f"[{formatted_time}] {username}: {message}")
+            display_name = format_user(username, flair)
+            print(f"[{formatted_time}] {display_name}: {message}")
 
 
 if __name__ == "__main__":

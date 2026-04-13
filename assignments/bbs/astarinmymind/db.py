@@ -36,4 +36,10 @@ def init_db():
             )
         """))
 
+        # Add flair column if it doesn't exist (for silver feature)
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN flair TEXT"))
+        except Exception:
+            pass  # Column already exists
+
         conn.commit()
