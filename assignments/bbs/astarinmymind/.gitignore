@@ -1,2 +1,4 @@
 bbs.json
+bbs.db
 *.pdf
+__pycache__/
