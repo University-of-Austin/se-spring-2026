@@ -40,7 +40,9 @@ def fmt_post(post):
 def cmd_post(args):
     if len(args) != 2:
         die("Usage: bbs.py post <username> <message>")
-    username, message = args[0].lower(), args[1]
+    username, message = args[0].strip().lower(), args[1]
+    if not username:
+        die("Username cannot be empty.")
     posts = load_posts()
     posts.append({
         "username": username,

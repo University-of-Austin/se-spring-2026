@@ -79,7 +79,9 @@ def get_or_create_user(conn, username, now=None):
 def cmd_post(args):
     if len(args) != 2:
         die("Usage: bbs_db.py post <username> <message>")
-    username, message = args[0].lower(), args[1]
+    username, message = args[0].strip().lower(), args[1]
+    if not username:
+        die("Username cannot be empty.")
     now = datetime.now().replace(microsecond=0).isoformat()
     with engine.begin() as conn:
         user_id, is_new = get_or_create_user(conn, username, now)
