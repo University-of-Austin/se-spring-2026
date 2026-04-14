@@ -6,6 +6,7 @@
 
 ```bash
 pip install sqlalchemy
+pip install windows-curses   # only needed on Windows, for the TUI
 ```
 
 Python 3.9+ required.
@@ -30,25 +31,28 @@ Data lives in `bbs.json` (posts) and `bbs_users.json` (profiles).
 ### Part B: SQLite Version
 
 ```bash
-python bbs_db.py post <user> <board> <msg>
-python bbs_db.py reply <post_id> <user> <msg>
-python bbs_db.py read [board]
-python bbs_db.py users
-python bbs_db.py boards
-python bbs_db.py search <keyword>
-python bbs_db.py profile <user>
-python bbs_db.py bio <user> <text>
-python bbs_db.py dm <from> <to> <msg>
-python bbs_db.py inbox <user>
-python bbs_db.py sent <user>
-python bbs_db.py react <user> <post_id> [emoji]
-python bbs_db.py trending
-python bbs_db.py export [file.json]
-python bbs_db.py import <file.json>
-python bbs_db.py interactive
+python bbs_db.py interactive          # <-- best way to use it
+python bbs_db.py tui                  # <-- full-screen curses interface
 ```
 
-Data stored in `bbs.db`. Tables are auto-created on first run.
+Or one-shot commands:
+
+```bash
+python bbs_db.py post <user> <board> <msg>
+python bbs_db.py read [board] [hot|new|top]
+python bbs_db.py upvote <user> <post_id>
+python bbs_db.py downvote <user> <post_id>
+python bbs_db.py pin <user> <post_id>
+python bbs_db.py react <user> <post_id> [emoji]
+python bbs_db.py trending
+python bbs_db.py dm <from> <to> <msg>
+python bbs_db.py inbox <user>
+python bbs_db.py games <user>
+python bbs_db.py leaderboard
+python bbs_db.py badges <user>
+python bbs_db.py export [file.json]
+python bbs_db.py import <file.json>
+```
 
 ### Part C: Migration
 
@@ -56,7 +60,11 @@ Data stored in `bbs.db`. Tables are auto-created on first run.
 python migrate.py
 ```
 
-Reads `bbs.json` (and `bbs_users.json` if present) and populates `bbs.db`.
+### Tests
+
+```bash
+python test_bbs.py    # 73 automated tests covering all features
+```
 
 ## Search: JSON vs SQL
 
@@ -80,15 +88,7 @@ match.
 running it twice gives the same result. This is intentional -- the migration
 is a one-time conversion, and wiping prevents duplicates if you run it again
 by accident. Reply relationships and board assignments are preserved with
-correctly mapped foreign keys. User profiles (bio, join date) from
-`bbs_users.json` are also carried over.
-
-If `bbs.db` already exists, all rows in `posts`, `boards`, and `users` are
-deleted before the import. I chose this over "skip duplicates" because
-duplicate detection is fragile (what if the message text is the same but the
-user is different?) and over "error out" because that would make the script
-annoying to re-run during development. A clean wipe-and-reload is the simplest
-correct behavior for a one-time migration.
+correctly mapped foreign keys.
 
 ## Silver Features
 
@@ -96,107 +96,130 @@ correct behavior for a one-time migration.
 
 Every post belongs to a named board. Replies inherit the parent's board.
 
-```bash
-python bbs_db.py post alice general "Hello everyone!"
-python bbs_db.py boards      # list boards with post counts
-python bbs_db.py read tech   # filter to one board
-```
-
 **Schema:** `boards` table (`id`, `name` UNIQUE) plus `board_id` FK on `posts`.
 
 ### 2. Threads
 
-Reply to any post by ID. Replies display indented under their parent:
-
-```
-[2026-04-13 10:00] [general] #1 alice: Hello!
-+-[2026-04-13 10:01] [general] #2 bob: Hi Alice!
-  +-[2026-04-13 10:02] [general] #3 alice: How's it going?
-```
+Reply to any post by ID. Replies display indented under their parent with
+`+-` tree connectors. Nesting is recursive -- replies can go arbitrarily deep.
 
 **Schema:** nullable `reply_to` column on `posts` referencing `posts(id)`.
 
 ### 3. User Profiles
 
-Auto-created on first post. Includes join date, post count, and settable bio.
-
-```bash
-python bbs_db.py profile alice
-python bbs_db.py bio alice "Retro computing fan"
-```
+Auto-created on first post. Includes join date, post count, settable bio, and
+earned achievement badges.
 
 **Schema:** `bio` (TEXT) and `joined` (TEXT) columns on `users`.
 
 ### 4. Colored Terminal Output
 
 ANSI-colored output with per-user color coding, dimmed metadata, yellow board
-tags, and tree connectors for threads. Respects `NO_COLOR` / `FORCE_COLOR`
-environment variables. All display logic is in `display.py`.
+tags, and tree connectors for threads. Respects `NO_COLOR` / `FORCE_COLOR`.
 
 ## Gold Features
 
 ### 5. Interactive Mode
 
-Instead of one-shot commands, `python bbs_db.py interactive` drops you into a
-live BBS session with a `username@bbs>` prompt. You log in once and then run
-commands without re-typing your username. The session checks for unread DMs on
-login and shows a notification. All commands from the one-shot CLI are available
-in shorter form (e.g., `post general "hello"` instead of
-`python bbs_db.py post alice general "hello"`).
+`python bbs_db.py interactive` drops you into a live `username@bbs>` session.
+You log in once and run commands without re-typing your name. On login it
+checks for unread DMs and notifies you, and checks for new achievements.
 
-This required no schema changes -- it's a REPL loop around the existing command
-functions, but it changes the feel of the program from a CLI tool to something
-that actually feels like dialing into a BBS.
+### 6. Full-Screen Curses TUI
 
-### 6. Private Messages
+`python bbs_db.py tui` launches a full-screen terminal interface built with
+the `curses` library. Features:
 
-Users can send direct messages to each other, check their inbox (with unread
-markers), and view sent messages.
+- Arrow-key menu navigation with highlighted selection
+- Scrollable post/message views (Page Up/Down, arrow keys)
+- Color-coded header bar with unread DM count
+- Status bar with contextual key hints
+- Inline commands (upvote/downvote/reply from the posts view)
+- Seamless transition to door games (temporarily exits curses, plays the
+  game in normal terminal mode, then returns)
+
+**No schema changes** -- the TUI is a presentation layer over the same database.
+Requires `windows-curses` on Windows.
+
+### 7. Private Messages
+
+DMs between users with read-tracking. Inbox shows `[NEW]` markers on unread
+messages, marks them read when viewed.
+
+**Schema:** `messages` table with `sender_id`, `recipient_id` (both FK->users),
+`body`, `timestamp`, `is_read`.
+
+### 8. Post Reactions & Trending
+
+Custom emoji reactions (one per user per post). Reactions display inline next
+to posts. `trending` ranks posts by combined vote + reaction score.
+
+**Schema:** `reactions` table with `UNIQUE(post_id, user_id)`.
+
+### 9. Upvote / Downvote System
+
+Separate from emoji reactions. Each user can upvote (+1) or downvote (-1) any
+post. Voting the same direction again **toggles it off** (removes the vote).
+Vote scores display inline as colored `[+N]` / `[-N]` tags.
+
+Three sort modes for `read`:
+- **default** -- chronological with pinned posts first
+- **hot** -- votes + recency bonus (posts from last 24h get +5)
+- **new** -- reverse chronological
+- **top** -- pure vote count descending
+
+**Schema:** `votes` table with `post_id`, `user_id`, `value` (+1/-1),
+`UNIQUE(post_id, user_id)`.
+
+### 10. Post Pinning
+
+Any user can pin a post. Pinned posts display at the top with a `[PINNED]`
+tag. Pinning again toggles it off.
+
+**Schema:** `is_pinned` column (INTEGER, default 0) on `posts`.
+
+### 11. Achievements / Badges
+
+9 badges awarded automatically when milestones are reached:
+
+| Badge | Requirement |
+|---|---|
+| First Post | Make your first post |
+| Chatterbox | Post 10 messages |
+| Reply King | Reply to 5 posts |
+| Board Explorer | Post in 3 different boards |
+| Social Butterfly | Send 5 DMs |
+| Popular | Get 5 upvotes on a single post |
+| Democracy! | Vote on 10 posts |
+| Gamer | Play a door game |
+| High Roller | Score 80+ in a door game |
+
+Badges show on profiles and via the `badges` command. New achievements trigger
+a `** Achievement Unlocked **` notification inline.
+
+**Schema:** `achievements` table with `user_id`, `badge`, `description`,
+`awarded`, `UNIQUE(user_id, badge)`.
+
+### 12. Door Games
+
+Three classic BBS-style mini-games accessible via `games`:
+
+- **Trivia Challenge** -- 10 random CS/tech questions, multiple choice,
+  10 pts each. Questions are shuffled each play.
+- **Hangman** -- Random word from a tech word list, classic ASCII art
+  gallows, score based on remaining lives.
+- **Number Guesser** -- Guess 1-100, score = 100 - (attempts-1)*10.
+
+All scores are saved to a leaderboard with per-user, per-game tracking.
+
+**Schema:** `high_scores` table with `user_id`, `game`, `score`, `timestamp`.
+
+### 13. Import / Export
+
+Full round-trip serialization covering posts, users, DMs, reactions, and votes.
+Import skips duplicate posts and merges new data.
 
 ```bash
-python bbs_db.py dm alice bob "Hey, want to collaborate?"
-python bbs_db.py inbox bob       # shows [NEW] on unread messages
-python bbs_db.py sent alice      # shows messages alice sent
+python bbs_db.py export backup.json
+python bbs_db.py import backup.json
 ```
-
-In interactive mode: `dm bob "Hey!"`, `inbox`, `sent`.
-
-**Schema:** new `messages` table with `sender_id` (FK->users), `recipient_id`
-(FK->users), `body`, `timestamp`, and `is_read` (integer flag). Messages are
-marked as read when the recipient views their inbox.
-
-### 7. Post Reactions & Trending
-
-Users can react to any post with a custom emoji tag (defaults to `+1`). Each
-user gets one reaction per post (reacting again updates the emoji). Reactions
-display inline next to posts when reading.
-
-```bash
-python bbs_db.py react alice 1         # reacts [+1] to post #1
-python bbs_db.py react bob 1 fire      # reacts [fire] to post #1
-python bbs_db.py trending              # shows top posts by reaction count
-```
-
-The `trending` command ranks posts by total reaction count, breaking ties by
-recency. This is deliberately simple -- a real trending algorithm would
-incorporate time-decay, but for a BBS with a small community, raw popularity
-is the right signal.
-
-**Schema:** new `reactions` table with `post_id` (FK->posts), `user_id`
-(FK->users), `emoji`, `timestamp`, and a `UNIQUE(post_id, user_id)` constraint
-to enforce one-reaction-per-user-per-post.
-
-### 8. Import / Export
-
-Full round-trip serialization. `export` dumps the entire database (posts, users,
-messages, reactions) to a JSON file. `import` loads a JSON file back in,
-skipping duplicate posts and merging new data.
-
-```bash
-python bbs_db.py export backup.json    # dump everything
-python bbs_db.py import backup.json    # load it back
-```
-
-This goes beyond the migration script -- it's a complete backup/restore system
-that handles all Gold-tier data (including DMs and reactions), not just the
-base posts and users.

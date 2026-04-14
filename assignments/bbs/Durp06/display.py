@@ -85,12 +85,15 @@ def print_banner() -> None:
 # ── Formatting helpers ──────────────────────────────────────────
 
 def fmt_post(ts: str, board: str, pid: int, user: str, msg: str,
-             depth: int = 0, reactions: str = "") -> str:
+             depth: int = 0, reactions: str = "", vote_str: str = "",
+             pinned: bool = False) -> str:
     indent = "  " * depth
     if depth > 0:
         indent = "  " * (depth - 1) + paint("+-", DIM)
-    parts = [
-        indent,
+    parts = [indent]
+    if pinned:
+        parts.append(paint("[PINNED] ", BOLD, BR_YELLOW))
+    parts += [
         paint(f"[{ts}]", DIM),
         " ",
         paint(f"[{board}]", YELLOW),
@@ -101,6 +104,9 @@ def fmt_post(ts: str, board: str, pid: int, user: str, msg: str,
         ": ",
         paint(msg, WHITE),
     ]
+    if vote_str:
+        parts.append("  ")
+        parts.append(vote_str)
     if reactions:
         parts.append("  ")
         parts.append(paint(reactions, BR_YELLOW))
@@ -141,7 +147,23 @@ def print_header(title: str) -> None:
     print(f"  {paint('-' * len(title), DIM)}")
 
 
-def print_profile(user: str, joined: str, posts: int, bio: str) -> None:
+def fmt_vote_score(up: int, down: int) -> str:
+    net = up - down
+    if net > 0:
+        return paint(f"[+{net}]", BOLD, BR_GREEN)
+    elif net < 0:
+        return paint(f"[{net}]", BOLD, BR_RED)
+    elif up + down > 0:
+        return paint("[0]", DIM)
+    return ""
+
+
+def fmt_badge(badge: str, desc: str) -> str:
+    return f"  {paint('[*]', BOLD, BR_YELLOW)} {paint(badge, BOLD, BR_CYAN)}  {paint(desc, DIM)}"
+
+
+def print_profile(user: str, joined: str, posts: int, bio: str,
+                  badges: list = None) -> None:
     sep = paint("-" * 30, DIM)
     print(sep)
     print(f"  {paint('User:', DIM)}    {paint(user, BOLD, color_for(user))}")
@@ -149,6 +171,10 @@ def print_profile(user: str, joined: str, posts: int, bio: str) -> None:
     print(f"  {paint('Posts:', DIM)}   {paint(str(posts), BR_YELLOW)}")
     bio_str = paint(bio, WHITE) if bio else paint("(none)", DIM)
     print(f"  {paint('Bio:', DIM)}     {bio_str}")
+    if badges:
+        print(f"  {paint('Badges:', DIM)}")
+        for badge, desc in badges:
+            print(f"    {paint('[*]', BOLD, BR_YELLOW)} {paint(badge, BR_CYAN)}")
     print(sep)
 
 
@@ -177,25 +203,75 @@ def fmt_trending(rank: int, pid: int, user: str, board: str, msg: str,
 
 def print_interactive_help() -> None:
     print(f"\n  {paint('Interactive Commands:', BOLD, BR_WHITE)}\n")
+    sections = [
+        ("Posts", [
+            ("post <board> <msg>", "Post a message"),
+            ("reply <id> <msg>", "Reply to a post"),
+            ("read [board]", "Read posts (hot/new/top)"),
+            ("pin <post_id>", "Pin/unpin a post"),
+            ("search <keyword>", "Search posts"),
+        ]),
+        ("Social", [
+            ("upvote <post_id>", "Upvote a post"),
+            ("downvote <post_id>", "Downvote a post"),
+            ("react <post_id> [emoji]", "React to a post"),
+            ("trending", "Show trending posts"),
+            ("dm <user> <msg>", "Send a private message"),
+            ("inbox", "View received messages"),
+            ("sent", "View sent messages"),
+        ]),
+        ("Profile", [
+            ("profile [user]", "View profile + badges"),
+            ("bio <text>", "Set your bio"),
+            ("badges", "View your achievements"),
+            ("users", "List users"),
+            ("boards", "List boards"),
+        ]),
+        ("Fun", [
+            ("games", "Play door games"),
+            ("leaderboard", "View game high scores"),
+        ]),
+        ("System", [
+            ("export [file.json]", "Export DB to JSON"),
+            ("import <file.json>", "Import JSON into DB"),
+            ("whoami", "Show current user"),
+            ("help", "Show this help"),
+            ("quit / exit", "Leave the BBS"),
+        ]),
+    ]
+    for section, cmds in sections:
+        print(f"  {paint(section, BOLD, BR_YELLOW)}")
+        for cmd, desc in cmds:
+            print(f"    {paint(cmd, CYAN)}  {paint(desc, DIM)}")
+        print()
+
+
+def print_usage(script: str) -> None:
+    print_banner()
+    print(f"  {paint('Commands:', BOLD, BR_WHITE)}\n")
     cmds = [
-        ("post <board> <msg>", "Post a message"),
-        ("reply <id> <msg>", "Reply to a post"),
-        ("read [board]", "Read posts"),
-        ("users", "List users"),
-        ("boards", "List boards"),
-        ("search <keyword>", "Search posts"),
-        ("profile [user]", "View profile (yours if no user given)"),
-        ("bio <text>", "Set your bio"),
-        ("dm <user> <msg>", "Send a private message"),
-        ("inbox", "View received messages"),
-        ("sent", "View sent messages"),
-        ("react <post_id> [emoji]", "React to a post (default: +1)"),
-        ("trending", "Show trending posts by reaction score"),
-        ("export [file.json]", "Export database to JSON"),
-        ("import <file.json>", "Import JSON into database"),
-        ("whoami", "Show current user"),
-        ("help", "Show this help"),
-        ("quit / exit", "Leave the BBS"),
+        (f"python {script} post <user> <board> <msg>", "Post a message"),
+        (f"python {script} reply <id> <user> <msg>", "Reply to a post"),
+        (f"python {script} read [board] [--sort hot|new|top]", "Read posts"),
+        (f"python {script} users", "List users"),
+        (f"python {script} boards", "List boards"),
+        (f"python {script} search <keyword>", "Search posts"),
+        (f"python {script} profile <user>", "View profile"),
+        (f"python {script} bio <user> <text>", "Set bio"),
+        (f"python {script} upvote <user> <post_id>", "Upvote a post"),
+        (f"python {script} downvote <user> <post_id>", "Downvote a post"),
+        (f"python {script} pin <user> <post_id>", "Pin/unpin a post"),
+        (f"python {script} react <user> <post_id> [emoji]", "React to a post"),
+        (f"python {script} trending", "Show trending posts"),
+        (f"python {script} dm <from> <to> <msg>", "Send a DM"),
+        (f"python {script} inbox <user>", "View inbox"),
+        (f"python {script} sent <user>", "View sent DMs"),
+        (f"python {script} games <user>", "Play door games"),
+        (f"python {script} leaderboard", "View game scores"),
+        (f"python {script} export [file.json]", "Export DB to JSON"),
+        (f"python {script} import <file.json>", "Import JSON into DB"),
+        (f"python {script} interactive", "Launch interactive mode"),
+        (f"python {script} tui", "Launch full-screen TUI"),
     ]
     for cmd, desc in cmds:
         print(f"  {paint(cmd, CYAN)}  {paint(desc, DIM)}")

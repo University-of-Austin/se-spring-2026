@@ -60,3 +60,44 @@ def init_db() -> None:
                 UNIQUE(post_id, user_id)
             )
         """))
+        # Gold: upvotes / downvotes (separate from emoji reactions)
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS votes (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id   INTEGER NOT NULL,
+                user_id   INTEGER NOT NULL,
+                value     INTEGER NOT NULL,
+                timestamp TEXT    NOT NULL,
+                FOREIGN KEY (post_id) REFERENCES posts(id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(post_id, user_id)
+            )
+        """))
+        # Gold: achievements / badges
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS achievements (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                badge       TEXT    NOT NULL,
+                description TEXT    NOT NULL,
+                awarded     TEXT    NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(user_id, badge)
+            )
+        """))
+        # Gold: door game high scores
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS high_scores (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id   INTEGER NOT NULL,
+                game      TEXT    NOT NULL,
+                score     INTEGER NOT NULL,
+                timestamp TEXT    NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """))
+        # Gold: pinned posts (add column if table already exists)
+        try:
+            conn.execute(text("ALTER TABLE posts ADD COLUMN is_pinned INTEGER DEFAULT 0"))
+        except Exception:
+            pass  # column already exists

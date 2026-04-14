@@ -5,6 +5,11 @@ Gold features beyond Silver:
   - Private messages (dm / inbox / sent)
   - Post reactions with trending algorithm
   - Import / export (full round-trip DB <-> JSON)
+  - Upvote / downvote with hot/new/top sorting
+  - Achievements / badges
+  - Post pinning
+  - Door games (trivia, hangman, number guessing) with leaderboard
+  - Full-screen curses TUI
 """
 
 import json
@@ -15,9 +20,10 @@ from sqlalchemy import text
 
 from db import engine, init_db
 from display import (
-    fmt_board, fmt_dim, fmt_dm, fmt_err, fmt_ok, fmt_post, fmt_search_hit,
-    fmt_trending, fmt_user, paint, print_banner, print_header,
-    print_interactive_help, print_profile, print_usage,
+    fmt_badge, fmt_board, fmt_dim, fmt_dm, fmt_err, fmt_ok, fmt_post,
+    fmt_search_hit, fmt_trending, fmt_user, fmt_vote_score, paint,
+    print_banner, print_header, print_interactive_help, print_profile,
+    print_usage,
     BOLD, BR_CYAN, BR_WHITE, BR_YELLOW, CYAN, DIM, GREEN, COLOR, RESET,
 )
 
@@ -49,7 +55,6 @@ def _get_or_create_board(conn, name):
 
 
 def _require_user(conn, username):
-    """Return user id or None if user doesn't exist."""
     row = conn.execute(
         text("SELECT id FROM users WHERE username = :u"), {"u": username},
     ).fetchone()
@@ -61,7 +66,6 @@ def _fmt_ts(ts):
 
 
 def _reaction_counts(conn):
-    """Return {post_id: {emoji: count}} mapping."""
     rows = conn.execute(
         text("SELECT post_id, emoji, COUNT(*) FROM reactions GROUP BY post_id, emoji")
     ).fetchall()
@@ -71,14 +75,135 @@ def _reaction_counts(conn):
     return result
 
 
+def _vote_counts(conn):
+    rows = conn.execute(
+        text("SELECT post_id, "
+             "SUM(CASE WHEN value > 0 THEN 1 ELSE 0 END), "
+             "SUM(CASE WHEN value < 0 THEN 1 ELSE 0 END) "
+             "FROM votes GROUP BY post_id")
+    ).fetchall()
+    return {pid: (up, down) for pid, up, down in rows}
+
+
 def _format_reaction_str(counts_for_post: dict) -> str:
-    """Format a dict like {'+1': 3, 'fire': 1} into a display string."""
     if not counts_for_post:
         return ""
     parts = []
     for emoji, count in sorted(counts_for_post.items(), key=lambda x: -x[1]):
         parts.append(f"[{emoji} x{count}]")
     return " ".join(parts)
+
+
+# ── Achievements ────────────────────────────────────────────────
+
+BADGE_DEFS = {
+    "first_post":    ("First Post",        "Made your first post"),
+    "chatterbox":    ("Chatterbox",         "Posted 10 messages"),
+    "reply_king":    ("Reply King",         "Replied to 5 posts"),
+    "explorer":      ("Board Explorer",     "Posted in 3 different boards"),
+    "social":        ("Social Butterfly",   "Sent 5 private messages"),
+    "popular":       ("Popular",            "Got 5 upvotes on a single post"),
+    "voter":         ("Democracy!",         "Voted on 10 posts"),
+    "gamer":         ("Gamer",              "Played a door game"),
+    "high_roller":   ("High Roller",        "Scored 80+ in a door game"),
+}
+
+
+def check_achievements(username):
+    """Check and award any new badges for this user. Returns list of newly awarded badges."""
+    newly_awarded = []
+    with engine.begin() as conn:
+        uid = _require_user(conn, username)
+        if uid is None:
+            return []
+
+        existing = {row[0] for row in conn.execute(
+            text("SELECT badge FROM achievements WHERE user_id = :uid"), {"uid": uid},
+        ).fetchall()}
+
+        ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+        def award(key):
+            if key not in existing:
+                name, desc = BADGE_DEFS[key]
+                conn.execute(
+                    text("INSERT OR IGNORE INTO achievements (user_id, badge, description, awarded) "
+                         "VALUES (:uid, :b, :d, :ts)"),
+                    {"uid": uid, "b": name, "d": desc, "ts": ts},
+                )
+                newly_awarded.append(name)
+
+        # First post
+        post_count = conn.execute(
+            text("SELECT COUNT(*) FROM posts WHERE user_id = :uid"), {"uid": uid},
+        ).fetchone()[0]
+        if post_count >= 1:
+            award("first_post")
+        if post_count >= 10:
+            award("chatterbox")
+
+        # Replies
+        reply_count = conn.execute(
+            text("SELECT COUNT(*) FROM posts WHERE user_id = :uid AND reply_to IS NOT NULL"),
+            {"uid": uid},
+        ).fetchone()[0]
+        if reply_count >= 5:
+            award("reply_king")
+
+        # Board explorer
+        board_count = conn.execute(
+            text("SELECT COUNT(DISTINCT board_id) FROM posts WHERE user_id = :uid"),
+            {"uid": uid},
+        ).fetchone()[0]
+        if board_count >= 3:
+            award("explorer")
+
+        # Social
+        dm_count = conn.execute(
+            text("SELECT COUNT(*) FROM messages WHERE sender_id = :uid"), {"uid": uid},
+        ).fetchone()[0]
+        if dm_count >= 5:
+            award("social")
+
+        # Popular
+        max_upvotes = conn.execute(
+            text("SELECT MAX(cnt) FROM ("
+                 "  SELECT COUNT(*) as cnt FROM votes "
+                 "  WHERE value > 0 AND post_id IN "
+                 "    (SELECT id FROM posts WHERE user_id = :uid) "
+                 "  GROUP BY post_id)"),
+            {"uid": uid},
+        ).fetchone()[0]
+        if max_upvotes and max_upvotes >= 5:
+            award("popular")
+
+        # Voter
+        vote_count = conn.execute(
+            text("SELECT COUNT(*) FROM votes WHERE user_id = :uid"), {"uid": uid},
+        ).fetchone()[0]
+        if vote_count >= 10:
+            award("voter")
+
+        # Gamer
+        game_count = conn.execute(
+            text("SELECT COUNT(*) FROM high_scores WHERE user_id = :uid"), {"uid": uid},
+        ).fetchone()[0]
+        if game_count >= 1:
+            award("gamer")
+
+        # High roller
+        best_score = conn.execute(
+            text("SELECT MAX(score) FROM high_scores WHERE user_id = :uid"), {"uid": uid},
+        ).fetchone()[0]
+        if best_score and best_score >= 80:
+            award("high_roller")
+
+    return newly_awarded
+
+
+def _notify_badges(badges):
+    for b in badges:
+        print(paint(f"  ** Achievement Unlocked: {b}! **", BOLD, BR_YELLOW))
 
 
 # ── Commands ────────────────────────────────────────────────────
@@ -103,12 +228,14 @@ def cmd_post(username, board_name, message, reply_to=None):
             {"uid": uid, "bid": bid, "msg": message, "ts": ts, "rt": reply_to},
         )
     print(fmt_ok("Posted."))
+    _notify_badges(check_achievements(username))
     return True
 
 
-def cmd_read(board_name=None):
+def cmd_read(board_name=None, sort_mode="default"):
     q = (
-        "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to "
+        "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to, "
+        "COALESCE(p.is_pinned, 0) as is_pinned "
         "FROM posts p "
         "JOIN users u ON p.user_id = u.id "
         "JOIN boards b ON p.board_id = b.id "
@@ -117,14 +244,28 @@ def cmd_read(board_name=None):
     if board_name:
         q += "WHERE b.name = :board "
         params["board"] = board_name
-    q += "ORDER BY p.id"
+
+    if sort_mode == "top":
+        q += ("ORDER BY (SELECT COALESCE(SUM(value), 0) FROM votes v "
+              "WHERE v.post_id = p.id) DESC, p.id DESC")
+    elif sort_mode == "new":
+        q += "ORDER BY p.id DESC"
+    elif sort_mode == "hot":
+        # Hot = votes + recency (posts from last 24h get a boost)
+        q += ("ORDER BY COALESCE(p.is_pinned, 0) DESC, "
+              "(SELECT COALESCE(SUM(value), 0) FROM votes v WHERE v.post_id = p.id) "
+              "+ CASE WHEN p.timestamp > datetime('now', '-1 day') THEN 5 ELSE 0 END DESC, "
+              "p.id DESC")
+    else:
+        q += "ORDER BY COALESCE(p.is_pinned, 0) DESC, p.id"
 
     with engine.connect() as conn:
         rows = conn.execute(text(q), params).fetchall()
         rcounts = _reaction_counts(conn)
+        vcounts = _vote_counts(conn)
 
     if board_name:
-        print_header(f"Board: {board_name}")
+        print_header(f"Board: {board_name}" + (f" (sort: {sort_mode})" if sort_mode != "default" else ""))
     else:
         print_banner()
 
@@ -134,9 +275,10 @@ def cmd_read(board_name=None):
         return
 
     roots, children = [], {}
-    for pid, user, board, msg, ts, reply_to in rows:
+    for pid, user, board, msg, ts, reply_to, pinned in rows:
         post = {"id": pid, "username": user, "board": board,
-                "message": msg, "timestamp": ts, "reply_to": reply_to}
+                "message": msg, "timestamp": ts, "reply_to": reply_to,
+                "pinned": bool(pinned)}
         if reply_to is None:
             roots.append(post)
         else:
@@ -145,8 +287,10 @@ def cmd_read(board_name=None):
     def walk(post, depth=0):
         ts = _fmt_ts(post["timestamp"])
         rstr = _format_reaction_str(rcounts.get(post["id"], {}))
+        up, down = vcounts.get(post["id"], (0, 0))
+        vstr = fmt_vote_score(up, down)
         print(fmt_post(ts, post["board"], post["id"], post["username"],
-                        post["message"], depth, rstr))
+                        post["message"], depth, rstr, vstr, post["pinned"]))
         for child in children.get(post["id"], []):
             walk(child, depth + 1)
 
@@ -222,7 +366,12 @@ def cmd_profile(username):
         count = conn.execute(
             text("SELECT COUNT(*) FROM posts WHERE user_id = :uid"), {"uid": uid},
         ).fetchone()[0]
-    print_profile(uname, _fmt_ts(joined), count, bio)
+        badge_rows = conn.execute(
+            text("SELECT badge, description FROM achievements WHERE user_id = :uid ORDER BY awarded"),
+            {"uid": uid},
+        ).fetchall()
+    badges = [(b, d) for b, d in badge_rows]
+    print_profile(uname, _fmt_ts(joined), count, bio, badges)
 
 
 def cmd_bio(username, bio_text):
@@ -239,7 +388,72 @@ def cmd_bio(username, bio_text):
     print(fmt_dim("Bio updated."))
 
 
-# ── Gold: Private Messages ──────────────────────────────────────
+# ── Upvote / Downvote ───────────────────────────────────────────
+
+def cmd_vote(username, post_id, value):
+    """value: +1 for upvote, -1 for downvote."""
+    label = "Upvoted" if value > 0 else "Downvoted"
+    with engine.begin() as conn:
+        uid = _require_user(conn, username)
+        if uid is None:
+            print(fmt_err(f"User '{username}' not found."))
+            return
+        post = conn.execute(
+            text("SELECT id FROM posts WHERE id = :id"), {"id": post_id},
+        ).fetchone()
+        if not post:
+            print(fmt_err(f"Post #{post_id} not found."))
+            return
+        existing = conn.execute(
+            text("SELECT id, value FROM votes WHERE post_id = :pid AND user_id = :uid"),
+            {"pid": post_id, "uid": uid},
+        ).fetchone()
+        ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        if existing:
+            if existing[1] == value:
+                # Remove vote (toggle off)
+                conn.execute(text("DELETE FROM votes WHERE id = :id"), {"id": existing[0]})
+                print(fmt_ok(f"Vote removed from post #{post_id}."))
+                return
+            conn.execute(
+                text("UPDATE votes SET value = :v, timestamp = :ts WHERE id = :id"),
+                {"v": value, "ts": ts, "id": existing[0]},
+            )
+        else:
+            conn.execute(
+                text("INSERT INTO votes (post_id, user_id, value, timestamp) "
+                     "VALUES (:pid, :uid, :v, :ts)"),
+                {"pid": post_id, "uid": uid, "v": value, "ts": ts},
+            )
+    print(fmt_ok(f"{label} post #{post_id}."))
+    _notify_badges(check_achievements(username))
+
+
+# ── Pin ─────────────────────────────────────────────────────────
+
+def cmd_pin(username, post_id):
+    with engine.begin() as conn:
+        uid = _require_user(conn, username)
+        if uid is None:
+            print(fmt_err(f"User '{username}' not found."))
+            return
+        post = conn.execute(
+            text("SELECT id, user_id, COALESCE(is_pinned, 0) FROM posts WHERE id = :id"),
+            {"id": post_id},
+        ).fetchone()
+        if not post:
+            print(fmt_err(f"Post #{post_id} not found."))
+            return
+        new_val = 0 if post[2] else 1
+        conn.execute(
+            text("UPDATE posts SET is_pinned = :v WHERE id = :id"),
+            {"v": new_val, "id": post_id},
+        )
+    action = "Pinned" if new_val else "Unpinned"
+    print(fmt_ok(f"{action} post #{post_id}."))
+
+
+# ── Private Messages ────────────────────────────────────────────
 
 def cmd_dm(sender, recipient, body):
     with engine.begin() as conn:
@@ -253,13 +467,12 @@ def cmd_dm(sender, recipient, body):
             return
         ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         conn.execute(
-            text(
-                "INSERT INTO messages (sender_id, recipient_id, body, timestamp) "
-                "VALUES (:sid, :rid, :body, :ts)"
-            ),
+            text("INSERT INTO messages (sender_id, recipient_id, body, timestamp) "
+                 "VALUES (:sid, :rid, :body, :ts)"),
             {"sid": sid, "rid": rid, "body": body, "ts": ts},
         )
     print(fmt_ok(f"Message sent to {recipient}."))
+    _notify_badges(check_achievements(sender))
 
 
 def cmd_inbox(username):
@@ -286,7 +499,6 @@ def cmd_inbox(username):
     for mid, sender, recip, body, ts, is_read in rows:
         print(fmt_dm(_fmt_ts(ts), sender, recip, body, unread=not is_read))
     print()
-    # Mark all as read
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE messages SET is_read = 1 WHERE recipient_id = :uid AND is_read = 0"),
@@ -320,7 +532,7 @@ def cmd_sent(username):
     print()
 
 
-# ── Gold: Reactions & Trending ──────────────────────────────────
+# ── Reactions & Trending ────────────────────────────────────────
 
 def cmd_react(username, post_id, emoji="+1"):
     with engine.begin() as conn:
@@ -347,29 +559,27 @@ def cmd_react(username, post_id, emoji="+1"):
             print(fmt_ok(f"Reaction updated to [{emoji}] on post #{post_id}."))
         else:
             conn.execute(
-                text(
-                    "INSERT INTO reactions (post_id, user_id, emoji, timestamp) "
-                    "VALUES (:pid, :uid, :e, :ts)"
-                ),
+                text("INSERT INTO reactions (post_id, user_id, emoji, timestamp) "
+                     "VALUES (:pid, :uid, :e, :ts)"),
                 {"pid": post_id, "uid": uid, "e": emoji, "ts": ts},
             )
             print(fmt_ok(f"Reacted [{emoji}] to post #{post_id}."))
 
 
 def cmd_trending(limit=10):
-    """Show posts ranked by a trending score: reactions + recency bonus."""
     with engine.connect() as conn:
         rows = conn.execute(
             text(
                 "SELECT p.id, u.username, b.name, p.message, p.timestamp, "
-                "       COUNT(r.id) as react_count "
+                "  COALESCE((SELECT SUM(value) FROM votes v WHERE v.post_id = p.id), 0) "
+                "  + COUNT(r.id) as score "
                 "FROM posts p "
                 "JOIN users u ON p.user_id = u.id "
                 "JOIN boards b ON p.board_id = b.id "
                 "LEFT JOIN reactions r ON r.post_id = p.id "
                 "GROUP BY p.id "
-                "HAVING react_count > 0 "
-                "ORDER BY react_count DESC, p.timestamp DESC "
+                "HAVING score > 0 "
+                "ORDER BY score DESC, p.timestamp DESC "
                 "LIMIT :lim"
             ),
             {"lim": limit},
@@ -377,25 +587,48 @@ def cmd_trending(limit=10):
         rcounts = _reaction_counts(conn)
     print_header("Trending Posts")
     if not rows:
-        print(fmt_dim("No reactions yet. Use 'react <post_id>' to get started!"))
+        print(fmt_dim("No reactions or votes yet."))
         return
-    for rank, (pid, user, board, msg, ts, react_count) in enumerate(rows, 1):
+    for rank, (pid, user, board, msg, ts, score) in enumerate(rows, 1):
         rstr = _format_reaction_str(rcounts.get(pid, {}))
-        print(fmt_trending(rank, pid, user, board, msg, react_count, rstr))
+        print(fmt_trending(rank, pid, user, board, msg, score, rstr))
     print()
 
 
-# ── Gold: Import / Export ───────────────────────────────────────
+# ── Badges display ──────────────────────────────────────────────
+
+def cmd_badges(username):
+    with engine.connect() as conn:
+        uid = _require_user(conn, username)
+        if uid is None:
+            print(fmt_err(f"User '{username}' not found."))
+            return
+        rows = conn.execute(
+            text("SELECT badge, description, awarded FROM achievements "
+                 "WHERE user_id = :uid ORDER BY awarded"),
+            {"uid": uid},
+        ).fetchall()
+    print_header(f"Badges for {username}")
+    if not rows:
+        print(fmt_dim("No badges yet. Keep posting!"))
+        return
+    for badge, desc, awarded in rows:
+        print(fmt_badge(badge, desc))
+    earned = len(rows)
+    total = len(BADGE_DEFS)
+    print(f"\n  {paint(f'{earned}/{total} badges earned', DIM)}")
+    print()
+
+
+# ── Import / Export ─────────────────────────────────────────────
 
 def cmd_export(filepath="export.json"):
     with engine.connect() as conn:
         posts = conn.execute(
             text(
                 "SELECT p.id, u.username, b.name, p.message, p.timestamp, p.reply_to "
-                "FROM posts p "
-                "JOIN users u ON p.user_id = u.id "
-                "JOIN boards b ON p.board_id = b.id "
-                "ORDER BY p.id"
+                "FROM posts p JOIN users u ON p.user_id = u.id "
+                "JOIN boards b ON p.board_id = b.id ORDER BY p.id"
             )
         ).fetchall()
         user_rows = conn.execute(
@@ -404,45 +637,41 @@ def cmd_export(filepath="export.json"):
         msg_rows = conn.execute(
             text(
                 "SELECT s.username, r.username, m.body, m.timestamp, m.is_read "
-                "FROM messages m "
-                "JOIN users s ON m.sender_id = s.id "
-                "JOIN users r ON m.recipient_id = r.id "
-                "ORDER BY m.id"
+                "FROM messages m JOIN users s ON m.sender_id = s.id "
+                "JOIN users r ON m.recipient_id = r.id ORDER BY m.id"
             )
         ).fetchall()
         react_rows = conn.execute(
             text(
                 "SELECT r.post_id, u.username, r.emoji, r.timestamp "
-                "FROM reactions r "
-                "JOIN users u ON r.user_id = u.id "
-                "ORDER BY r.id"
+                "FROM reactions r JOIN users u ON r.user_id = u.id ORDER BY r.id"
+            )
+        ).fetchall()
+        vote_rows = conn.execute(
+            text(
+                "SELECT v.post_id, u.username, v.value, v.timestamp "
+                "FROM votes v JOIN users u ON v.user_id = u.id ORDER BY v.id"
             )
         ).fetchall()
 
     data = {
-        "posts": [
-            {"id": pid, "username": u, "board": b, "message": m,
-             "timestamp": ts, "reply_to": rt}
-            for pid, u, b, m, ts, rt in posts
-        ],
-        "users": {
-            u: {"joined": j, "bio": bio or ""}
-            for u, j, bio in user_rows
-        },
-        "messages": [
-            {"sender": s, "recipient": r, "body": body, "timestamp": ts, "is_read": bool(ir)}
-            for s, r, body, ts, ir in msg_rows
-        ],
-        "reactions": [
-            {"post_id": pid, "username": u, "emoji": e, "timestamp": ts}
-            for pid, u, e, ts in react_rows
-        ],
+        "posts": [{"id": pid, "username": u, "board": b, "message": m,
+                    "timestamp": ts, "reply_to": rt}
+                   for pid, u, b, m, ts, rt in posts],
+        "users": {u: {"joined": j, "bio": bio or ""} for u, j, bio in user_rows},
+        "messages": [{"sender": s, "recipient": r, "body": body,
+                       "timestamp": ts, "is_read": bool(ir)}
+                      for s, r, body, ts, ir in msg_rows],
+        "reactions": [{"post_id": pid, "username": u, "emoji": e, "timestamp": ts}
+                       for pid, u, e, ts in react_rows],
+        "votes": [{"post_id": pid, "username": u, "value": v, "timestamp": ts}
+                   for pid, u, v, ts in vote_rows],
     }
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
     print(fmt_dim(f"Exported {len(data['posts'])} posts, {len(data['users'])} users, "
-                  f"{len(data['messages'])} messages, {len(data['reactions'])} reactions "
-                  f"to {filepath}"))
+                  f"{len(data['messages'])} msgs, {len(data['reactions'])} reactions, "
+                  f"{len(data['votes'])} votes to {filepath}"))
 
 
 def cmd_import(filepath):
@@ -460,96 +689,72 @@ def cmd_import(filepath):
     user_profiles = data.get("users", {})
     messages = data.get("messages", [])
     reactions = data.get("reactions", [])
+    votes = data.get("votes", [])
 
     if not posts:
         print(fmt_dim("No posts to import."))
         return
 
     with engine.begin() as conn:
-        # Users
         all_usernames = sorted({p["username"] for p in posts})
         uid_map = {}
         for uname in all_usernames:
-            row = conn.execute(
-                text("SELECT id FROM users WHERE username = :u"), {"u": uname},
-            ).fetchone()
+            row = conn.execute(text("SELECT id FROM users WHERE username = :u"), {"u": uname}).fetchone()
             if row:
                 uid_map[uname] = row[0]
             else:
                 profile = user_profiles.get(uname, {})
-                joined = profile.get("joined", posts[0]["timestamp"])
-                bio = profile.get("bio", "")
                 uid_map[uname] = conn.execute(
                     text("INSERT INTO users (username, joined, bio) VALUES (:u, :j, :b)"),
-                    {"u": uname, "j": joined, "b": bio},
+                    {"u": uname, "j": profile.get("joined", posts[0]["timestamp"]),
+                     "b": profile.get("bio", "")},
                 ).lastrowid
 
-        # Boards
         board_names = sorted({p.get("board", "general") for p in posts})
         bid_map = {}
         for bname in board_names:
-            row = conn.execute(
-                text("SELECT id FROM boards WHERE name = :n"), {"n": bname},
-            ).fetchone()
-            if row:
-                bid_map[bname] = row[0]
-            else:
-                bid_map[bname] = conn.execute(
-                    text("INSERT INTO boards (name) VALUES (:n)"), {"n": bname},
-                ).lastrowid
+            row = conn.execute(text("SELECT id FROM boards WHERE name = :n"), {"n": bname}).fetchone()
+            bid_map[bname] = row[0] if row else conn.execute(
+                text("INSERT INTO boards (name) VALUES (:n)"), {"n": bname}).lastrowid
 
-        # Posts
         old_to_new = {}
         added, skipped = 0, 0
         for p in posts:
             board = p.get("board", "general")
             existing = conn.execute(
-                text(
-                    "SELECT p.id FROM posts p "
-                    "JOIN users u ON p.user_id = u.id "
-                    "WHERE u.username = :u AND p.message = :m AND p.timestamp = :ts"
-                ),
+                text("SELECT p.id FROM posts p JOIN users u ON p.user_id = u.id "
+                     "WHERE u.username = :u AND p.message = :m AND p.timestamp = :ts"),
                 {"u": p["username"], "m": p["message"], "ts": p["timestamp"]},
             ).fetchone()
             if existing:
-                old_id = p.get("id")
-                if old_id is not None:
-                    old_to_new[old_id] = existing[0]
+                if p.get("id") is not None:
+                    old_to_new[p["id"]] = existing[0]
                 skipped += 1
                 continue
-
             reply_to = p.get("reply_to")
             new_reply = old_to_new.get(reply_to) if reply_to is not None else None
             new_id = conn.execute(
-                text(
-                    "INSERT INTO posts (user_id, board_id, message, timestamp, reply_to) "
-                    "VALUES (:uid, :bid, :msg, :ts, :rt)"
-                ),
+                text("INSERT INTO posts (user_id, board_id, message, timestamp, reply_to) "
+                     "VALUES (:uid, :bid, :msg, :ts, :rt)"),
                 {"uid": uid_map[p["username"]], "bid": bid_map[board],
                  "msg": p["message"], "ts": p["timestamp"], "rt": new_reply},
             ).lastrowid
-            old_id = p.get("id")
-            if old_id is not None:
-                old_to_new[old_id] = new_id
+            if p.get("id") is not None:
+                old_to_new[p["id"]] = new_id
             added += 1
 
-        # Messages
         msg_added = 0
         for m in messages:
-            sid = uid_map.get(m["sender"])
-            rid = uid_map.get(m["recipient"])
+            sid, rid = uid_map.get(m["sender"]), uid_map.get(m["recipient"])
             if sid and rid:
                 conn.execute(
-                    text(
-                        "INSERT INTO messages (sender_id, recipient_id, body, timestamp, is_read) "
-                        "VALUES (:s, :r, :b, :ts, :ir)"
-                    ),
-                    {"s": sid, "r": rid, "b": m["body"],
-                     "ts": m["timestamp"], "ir": int(m.get("is_read", False))},
+                    text("INSERT INTO messages (sender_id, recipient_id, body, timestamp, is_read) "
+                         "VALUES (:s, :r, :b, :ts, :ir)"),
+                    {"s": sid, "r": rid, "b": m["body"], "ts": m["timestamp"],
+                     "ir": int(m.get("is_read", False))},
                 )
                 msg_added += 1
 
-        # Reactions
         react_added = 0
         for r in reactions:
             uid = uid_map.get(r["username"])
@@ -557,29 +762,42 @@ def cmd_import(filepath):
             if uid:
                 try:
                     conn.execute(
-                        text(
-                            "INSERT OR IGNORE INTO reactions (post_id, user_id, emoji, timestamp) "
-                            "VALUES (:pid, :uid, :e, :ts)"
-                        ),
+                        text("INSERT OR IGNORE INTO reactions (post_id, user_id, emoji, timestamp) "
+                             "VALUES (:pid, :uid, :e, :ts)"),
                         {"pid": new_pid, "uid": uid, "e": r["emoji"], "ts": r["timestamp"]},
                     )
                     react_added += 1
                 except Exception:
                     pass
 
+        vote_added = 0
+        for v in votes:
+            uid = uid_map.get(v["username"])
+            new_pid = old_to_new.get(v["post_id"], v["post_id"])
+            if uid:
+                try:
+                    conn.execute(
+                        text("INSERT OR IGNORE INTO votes (post_id, user_id, value, timestamp) "
+                             "VALUES (:pid, :uid, :v, :ts)"),
+                        {"pid": new_pid, "uid": uid, "v": v["value"], "ts": v["timestamp"]},
+                    )
+                    vote_added += 1
+                except Exception:
+                    pass
+
     print(fmt_dim(f"Import: {added} posts added, {skipped} skipped, "
-                  f"{msg_added} messages, {react_added} reactions."))
+                  f"{msg_added} msgs, {react_added} reactions, {vote_added} votes."))
 
 
-# ── Gold: Interactive Mode ──────────────────────────────────────
+# ── Interactive Mode ────────────────────────────────────────────
 
 def interactive_mode():
-    """Drop into a live BBS session with a logged-in user."""
+    from games import games_menu, show_leaderboard
+
     print_banner()
     print(fmt_dim("Welcome to interactive mode!"))
     print()
 
-    # Login / register
     while True:
         try:
             username = input(paint("  Enter username: ", BOLD, BR_CYAN) if COLOR
@@ -593,7 +811,6 @@ def interactive_mode():
             _get_or_create_user(conn, username)
         break
 
-    # Check for unread DMs
     with engine.connect() as conn:
         uid = _require_user(conn, username)
         unread = conn.execute(
@@ -603,10 +820,12 @@ def interactive_mode():
     print(fmt_ok(f"Logged in as {username}."))
     if unread > 0:
         print(paint(f"  You have {unread} unread message(s). Type 'inbox' to read.", BR_YELLOW))
+
+    # Check for new achievements on login
+    _notify_badges(check_achievements(username))
     print(f"  {paint('Type', DIM)} {paint('help', CYAN)} {paint('for commands.', DIM)}")
     print()
 
-    # REPL
     prompt = paint(f"  {username}@bbs> ", BOLD, GREEN) if COLOR else f"  {username}@bbs> "
     while True:
         try:
@@ -645,19 +864,22 @@ def interactive_mode():
                 continue
             with engine.connect() as conn:
                 parent = conn.execute(
-                    text(
-                        "SELECT b.name FROM posts p "
-                        "JOIN boards b ON p.board_id = b.id "
-                        "WHERE p.id = :id"
-                    ),
-                    {"id": reply_id},
+                    text("SELECT b.name FROM posts p JOIN boards b ON p.board_id = b.id "
+                         "WHERE p.id = :id"), {"id": reply_id},
                 ).fetchone()
             if not parent:
                 print(fmt_err(f"Post #{reply_id} not found."))
                 continue
             cmd_post(username, parent[0], sub[2], reply_to=reply_id)
         elif cmd == "read":
-            cmd_read(parts[1] if len(parts) >= 2 else None)
+            board = None
+            sort_mode = "default"
+            rest = parts[1] if len(parts) >= 2 else ""
+            if rest in ("hot", "new", "top"):
+                sort_mode = rest
+            elif rest:
+                board = rest
+            cmd_read(board, sort_mode)
         elif cmd == "users":
             cmd_users()
         elif cmd == "boards":
@@ -668,13 +890,36 @@ def interactive_mode():
                 continue
             cmd_search(parts[1])
         elif cmd == "profile":
-            target = parts[1] if len(parts) >= 2 else username
-            cmd_profile(target)
+            cmd_profile(parts[1] if len(parts) >= 2 else username)
         elif cmd == "bio":
             if len(parts) < 2:
                 print(fmt_err("Usage: bio <text>"))
                 continue
             cmd_bio(username, line.split(None, 1)[1])
+        elif cmd == "upvote":
+            if len(parts) < 2:
+                print(fmt_err("Usage: upvote <post_id>"))
+                continue
+            try:
+                cmd_vote(username, int(parts[1]), +1)
+            except ValueError:
+                print(fmt_err("post_id must be a number."))
+        elif cmd == "downvote":
+            if len(parts) < 2:
+                print(fmt_err("Usage: downvote <post_id>"))
+                continue
+            try:
+                cmd_vote(username, int(parts[1]), -1)
+            except ValueError:
+                print(fmt_err("post_id must be a number."))
+        elif cmd == "pin":
+            if len(parts) < 2:
+                print(fmt_err("Usage: pin <post_id>"))
+                continue
+            try:
+                cmd_pin(username, int(parts[1]))
+            except ValueError:
+                print(fmt_err("post_id must be a number."))
         elif cmd == "dm":
             sub = line.split(None, 2)
             if len(sub) < 3:
@@ -698,9 +943,14 @@ def interactive_mode():
             cmd_react(username, pid, emoji)
         elif cmd == "trending":
             cmd_trending()
+        elif cmd == "badges":
+            cmd_badges(username)
+        elif cmd == "games":
+            games_menu(username)
+        elif cmd == "leaderboard":
+            show_leaderboard()
         elif cmd == "export":
-            fpath = parts[1] if len(parts) >= 2 else "export.json"
-            cmd_export(fpath)
+            cmd_export(parts[1] if len(parts) >= 2 else "export.json")
         elif cmd == "import":
             if len(parts) < 2:
                 print(fmt_err("Usage: import <file.json>"))
@@ -724,6 +974,9 @@ def main():
 
     if cmd == "interactive":
         interactive_mode()
+    elif cmd == "tui":
+        from tui import run_tui
+        run_tui()
     elif cmd == "post" and len(args) >= 4:
         cmd_post(args[1], args[2], args[3])
     elif cmd == "reply" and len(args) >= 4:
@@ -734,19 +987,25 @@ def main():
             sys.exit(1)
         with engine.connect() as conn:
             parent = conn.execute(
-                text(
-                    "SELECT b.name FROM posts p "
-                    "JOIN boards b ON p.board_id = b.id "
-                    "WHERE p.id = :id"
-                ),
-                {"id": reply_id},
+                text("SELECT b.name FROM posts p JOIN boards b ON p.board_id = b.id "
+                     "WHERE p.id = :id"), {"id": reply_id},
             ).fetchone()
         if not parent:
             print(fmt_err(f"Post #{reply_id} not found."))
             sys.exit(1)
         cmd_post(args[2], parent[0], args[3], reply_to=reply_id)
     elif cmd == "read":
-        cmd_read(args[1] if len(args) >= 2 else None)
+        board = None
+        sort_mode = "default"
+        rest = args[1:]
+        for a in rest:
+            if a.startswith("--sort"):
+                continue
+            elif a in ("hot", "new", "top"):
+                sort_mode = a
+            else:
+                board = a
+        cmd_read(board, sort_mode)
     elif cmd == "users":
         cmd_users()
     elif cmd == "boards":
@@ -757,6 +1016,21 @@ def main():
         cmd_profile(args[1])
     elif cmd == "bio" and len(args) >= 3:
         cmd_bio(args[1], args[2])
+    elif cmd == "upvote" and len(args) >= 3:
+        try:
+            cmd_vote(args[1], int(args[2]), +1)
+        except ValueError:
+            print(fmt_err("post_id must be a number."))
+    elif cmd == "downvote" and len(args) >= 3:
+        try:
+            cmd_vote(args[1], int(args[2]), -1)
+        except ValueError:
+            print(fmt_err("post_id must be a number."))
+    elif cmd == "pin" and len(args) >= 3:
+        try:
+            cmd_pin(args[1], int(args[2]))
+        except ValueError:
+            print(fmt_err("post_id must be a number."))
     elif cmd == "dm" and len(args) >= 4:
         cmd_dm(args[1], args[2], args[3])
     elif cmd == "inbox" and len(args) >= 2:
@@ -769,12 +1043,18 @@ def main():
             cmd_react(args[1], int(args[2]), emoji)
         except ValueError:
             print(fmt_err("post_id must be a number."))
-            sys.exit(1)
     elif cmd == "trending":
         cmd_trending()
+    elif cmd == "badges" and len(args) >= 2:
+        cmd_badges(args[1])
+    elif cmd == "games" and len(args) >= 2:
+        from games import games_menu
+        games_menu(args[1])
+    elif cmd == "leaderboard":
+        from games import show_leaderboard
+        show_leaderboard()
     elif cmd == "export":
-        fpath = args[1] if len(args) >= 2 else "export.json"
-        cmd_export(fpath)
+        cmd_export(args[1] if len(args) >= 2 else "export.json")
     elif cmd == "import" and len(args) >= 2:
         cmd_import(args[1])
     else:
