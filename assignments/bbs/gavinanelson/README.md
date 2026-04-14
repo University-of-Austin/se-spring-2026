@@ -15,12 +15,6 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-If you want to verify the environment after install:
-
-```bash
-python -m unittest -v
-```
-
 ## Storage
 
 The app now stores its runtime data in a real app-data directory instead of assuming you launch it from the repo:
@@ -80,6 +74,15 @@ python migrate.py
 ```
 
 After installation with `pip install -e .`, the same functionality is also available through the convenience commands `bbs`, `bbs-db`, `bbs-migrate`, `bbs-seed`, and `bbs-tui`.
+
+A quick smoke test after install is:
+
+```bash
+python bbs.py post alice "hello"
+python bbs.py read
+python bbs_db.py post alice "hello from sqlite"
+python bbs_db.py read
+```
 
 Gold-tier extras:
 
