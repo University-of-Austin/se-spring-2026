@@ -72,19 +72,20 @@ def print_banner() -> None:
     if COLOR:
         for line, clr in BANNER_COLORED:
             print(f"{clr}{line}{RESET}")
-        print(f"  {DIM}Bulletin Board System{RESET}  {BR_YELLOW}v1.0{RESET}")
+        print(f"  {DIM}Bulletin Board System{RESET}  {BR_YELLOW}v2.0 Gold{RESET}")
         print(f"  {DIM}{'-' * 28}{RESET}")
     else:
         for line in BANNER.strip("\n").splitlines():
             print(line)
-        print("  Bulletin Board System  v1.0")
+        print("  Bulletin Board System  v2.0 Gold")
         print("  " + "-" * 28)
     print()
 
 
 # ── Formatting helpers ──────────────────────────────────────────
 
-def fmt_post(ts: str, board: str, pid: int, user: str, msg: str, depth: int = 0) -> str:
+def fmt_post(ts: str, board: str, pid: int, user: str, msg: str,
+             depth: int = 0, reactions: str = "") -> str:
     indent = "  " * depth
     if depth > 0:
         indent = "  " * (depth - 1) + paint("+-", DIM)
@@ -100,6 +101,9 @@ def fmt_post(ts: str, board: str, pid: int, user: str, msg: str, depth: int = 0)
         ": ",
         paint(msg, WHITE),
     ]
+    if reactions:
+        parts.append("  ")
+        parts.append(paint(reactions, BR_YELLOW))
     return "".join(parts)
 
 
@@ -148,6 +152,56 @@ def print_profile(user: str, joined: str, posts: int, bio: str) -> None:
     print(sep)
 
 
+def fmt_dm(ts: str, sender: str, recipient: str, body: str, unread: bool = False) -> str:
+    marker = paint(" [NEW]", BR_GREEN) if unread else ""
+    return (
+        f"  {paint(f'[{ts}]', DIM)} "
+        f"{paint(sender, BOLD, color_for(sender))} -> "
+        f"{paint(recipient, BOLD, color_for(recipient))}: "
+        f"{paint(body, WHITE)}{marker}"
+    )
+
+
+def fmt_trending(rank: int, pid: int, user: str, board: str, msg: str,
+                 score: int, reaction_str: str) -> str:
+    return (
+        f"  {paint(f'{rank}.', BOLD, BR_WHITE)} "
+        f"{paint(f'#{pid}', DIM)} "
+        f"{paint(f'[{board}]', YELLOW)} "
+        f"{paint(user, BOLD, color_for(user))}: "
+        f"{paint(msg, WHITE)}  "
+        f"{paint(reaction_str, BR_YELLOW)}  "
+        f"{paint(f'(score: {score})', DIM)}"
+    )
+
+
+def print_interactive_help() -> None:
+    print(f"\n  {paint('Interactive Commands:', BOLD, BR_WHITE)}\n")
+    cmds = [
+        ("post <board> <msg>", "Post a message"),
+        ("reply <id> <msg>", "Reply to a post"),
+        ("read [board]", "Read posts"),
+        ("users", "List users"),
+        ("boards", "List boards"),
+        ("search <keyword>", "Search posts"),
+        ("profile [user]", "View profile (yours if no user given)"),
+        ("bio <text>", "Set your bio"),
+        ("dm <user> <msg>", "Send a private message"),
+        ("inbox", "View received messages"),
+        ("sent", "View sent messages"),
+        ("react <post_id> [emoji]", "React to a post (default: +1)"),
+        ("trending", "Show trending posts by reaction score"),
+        ("export [file.json]", "Export database to JSON"),
+        ("import <file.json>", "Import JSON into database"),
+        ("whoami", "Show current user"),
+        ("help", "Show this help"),
+        ("quit / exit", "Leave the BBS"),
+    ]
+    for cmd, desc in cmds:
+        print(f"  {paint(cmd, CYAN)}  {paint(desc, DIM)}")
+    print()
+
+
 def print_usage(script: str) -> None:
     print_banner()
     print(f"  {paint('Commands:', BOLD, BR_WHITE)}\n")
@@ -160,6 +214,14 @@ def print_usage(script: str) -> None:
         (f"python {script} search <keyword>", "Search posts"),
         (f"python {script} profile <user>", "View profile"),
         (f"python {script} bio <user> <text>", "Set bio"),
+        (f"python {script} dm <from> <to> <msg>", "Send a DM"),
+        (f"python {script} inbox <user>", "View inbox"),
+        (f"python {script} sent <user>", "View sent DMs"),
+        (f"python {script} react <user> <post_id> [emoji]", "React to a post"),
+        (f"python {script} trending", "Show trending posts"),
+        (f"python {script} export [file.json]", "Export DB to JSON"),
+        (f"python {script} import <file.json>", "Import JSON into DB"),
+        (f"python {script} interactive", "Launch interactive mode"),
     ]
     for cmd, desc in cmds:
         print(f"  {paint(cmd, CYAN)}  {paint(desc, DIM)}")

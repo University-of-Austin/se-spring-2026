@@ -34,3 +34,29 @@ def init_db() -> None:
                 FOREIGN KEY (reply_to) REFERENCES posts(id)
             )
         """))
+        # Gold: private messages
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id    INTEGER NOT NULL,
+                recipient_id INTEGER NOT NULL,
+                body         TEXT    NOT NULL,
+                timestamp    TEXT    NOT NULL,
+                is_read      INTEGER DEFAULT 0,
+                FOREIGN KEY (sender_id)    REFERENCES users(id),
+                FOREIGN KEY (recipient_id) REFERENCES users(id)
+            )
+        """))
+        # Gold: post reactions (one per user per post)
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS reactions (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id   INTEGER NOT NULL,
+                user_id   INTEGER NOT NULL,
+                emoji     TEXT    NOT NULL DEFAULT '+1',
+                timestamp TEXT    NOT NULL,
+                FOREIGN KEY (post_id) REFERENCES posts(id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                UNIQUE(post_id, user_id)
+            )
+        """))
