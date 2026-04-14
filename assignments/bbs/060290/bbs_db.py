@@ -1,10 +1,21 @@
+import os
 import sys
 from datetime import datetime
 
 from sqlalchemy import text
 from db import engine, init_db
 
+COVER_ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wild_west_backgrounds", "01_beginning.txt")
+
+
+def show_welcome():
+    if os.path.exists(COVER_ART):
+        with open(COVER_ART, "r") as f:
+            print(f.read())
+
+
 init_db()
+show_welcome()
 
 
 def post(username, message):
