@@ -1,6 +1,6 @@
 # Patrick README
 
-I used Python 3, with sqlalchemy, and no other dependencies. The commands are python bbs.py post <user> <msg>, python bbs_db.py post/read/users/search/profile/bio, and python migrate.py. All files need to be in the same directory, and the tables are automatically made on the first run.
+I used Python 3, with sqlalchemy, and no other dependencies. The commands are python bbs.py post/read/users/search <user> <msg>, python bbs_db.py post/read/users/search/profile/bio, and python migrate.py. All files need to be in the same directory, and the tables are automatically made on the first run.
 
 My goal is to reach the silver tier.
 
