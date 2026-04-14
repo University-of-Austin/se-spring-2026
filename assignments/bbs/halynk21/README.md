@@ -239,7 +239,7 @@ verify exactly what was imported.
 ## Repository layout
 
 ```
-assignments/bbs/<your-github-username>/
+assignments/bbs/halynk21/
 ├── bbs.py           Part A — JSON storage
 ├── db.py            SQLAlchemy engine + schema
 ├── bbs_db.py        Part B + Gold — SQLite BBS
@@ -247,6 +247,3 @@ assignments/bbs/<your-github-username>/
 ├── requirements.txt sqlalchemy, rich
 └── README.md        This file
 ```
-
-> **Before submitting:** rename the directory from `<your-github-username>`
-> to your actual GitHub username, then open a PR titled **"BBS — Your Name"**.
