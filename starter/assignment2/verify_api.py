@@ -11,7 +11,7 @@ a clean database. You can run it over and over against the same server.
 If you want to start fresh, stop your server, delete bbs.db, and
 restart.
 
-TWO SECTIONS ARE MARKED 'STUDENT TODO'. You must fill them in to
+THREE SECTIONS ARE MARKED 'STUDENT TODO'. You must fill them in to
 complete the bronze tier. Read the assignment PDF for the exact
 behavior each section should verify.
 """
@@ -93,6 +93,30 @@ def main() -> int:
     # When you've implemented it, uncomment the call below.
     # ==================================================================
     # run_pagination_checks(c, state)
+
+    # ==================================================================
+    # STUDENT TODO #3: exact response field shapes
+    #
+    # Implement run_field_shape_checks() below. It should verify that
+    # your response bodies contain EXACTLY the fields the spec lists.
+    # No extras, nothing missing.
+    #
+    # A user object (from POST /users, GET /users/{username}, and items
+    # in GET /users) has exactly {username, created_at}.
+    #
+    # A post object (from POST /posts, GET /posts/{id}, and items in
+    # GET /posts) has exactly {id, username, message, created_at}.
+    #
+    # An extra field like `email`, `updated_at`, or `user_id` is a FAIL.
+    # A missing field is a FAIL. You will need to compare
+    # set(body.keys()) against the expected set for each shape.
+    #
+    # Create fresh users and posts inside this function if you want
+    # isolation, or reuse state["alice_post_id"] and friends.
+    #
+    # When you've implemented it, uncomment the call below.
+    # ==================================================================
+    # run_field_shape_checks(c, state)
 
     print()
     print(f"{PASSED} passed, {FAILED} failed")
@@ -244,6 +268,13 @@ def run_pagination_checks(c: httpx.Client, state: dict) -> None:
     # STUDENT TODO #2: implement this function. See the comment above for
     # the list of behaviors to verify. Use the `check()` helper.
     raise NotImplementedError("student must implement run_pagination_checks")
+
+
+def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
+    # STUDENT TODO #3: implement this function. See the comment above for
+    # the full spec. Assert that each response body has EXACTLY the
+    # expected set of keys (set equality, not a subset check).
+    raise NotImplementedError("student must implement run_field_shape_checks")
 
 
 if __name__ == "__main__":
