@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}BBS — {{ profile.username }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> PROFILE: {{ profile.username }}
+  {% if profile.role != 'user' %}
+    <span class="badge" style="margin-left:0.5rem">{{ profile.role|upper }}</span>
+  {% endif %}
+  {% if profile.is_banned %}
+    <span class="badge" style="background:rgba(255,68,68,0.15);color:var(--red);border-color:var(--red);margin-left:0.5rem">BANNED</span>
+  {% endif %}
+</div>
+
+<div class="profile-header">
+  {% if profile.avatar_ascii %}
+  <div class="profile-avatar">{{ profile.avatar_ascii }}</div>
+  {% endif %}
+  <div class="profile-info">
+    <h2>{{ profile.username }}</h2>
+    <div class="profile-stat">Joined: {{ profile.joined[:10] }}</div>
+    <div class="profile-stat">Posts: {{ profile.post_count }}</div>
+    {% if profile.bio %}
+    <div class="profile-bio">{{ profile.bio }}</div>
+    {% endif %}
+    {% if profile.badges %}
+    <div class="badge-grid">
+      {% for badge, desc, awarded in profile.badges %}
+      <span class="badge" title="{{ desc }}">{{ badge }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if user and user.username == profile.username %}
+<div class="card mt-2">
+  <div class="page-header" style="font-size:1rem;margin-bottom:1rem">Edit Profile</div>
+  <form action="/profile/bio" method="post" class="mb-2">
+    <div class="form-group">
+      <label class="form-label">Bio</label>
+      <input type="text" name="bio" class="form-input" value="{{ profile.bio }}" placeholder="Tell us about yourself">
+    </div>
+    <button type="submit" class="btn btn-sm">Update Bio</button>
+  </form>
+  <form action="/profile/avatar" method="post">
+    <div class="form-group">
+      <label class="form-label">ASCII Avatar (10 lines max, 40 chars wide)</label>
+      <textarea name="avatar" class="form-textarea" rows="6" style="font-family:var(--font-mono);font-size:0.75rem;line-height:1.2" placeholder="  /\_/\&#10; ( o.o )&#10;  > ^ <">{{ profile.avatar_ascii }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-sm">Update Avatar</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
