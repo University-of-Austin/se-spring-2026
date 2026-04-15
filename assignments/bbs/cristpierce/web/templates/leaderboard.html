@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}BBS — Leaderboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> LEADERBOARD
+</div>
+
+<div class="sort-tabs mb-2">
+  <a href="/leaderboard" class="sort-tab {% if not current_game %}active{% endif %}">all</a>
+  {% for g in games %}
+  <a href="/leaderboard?game={{ g }}" class="sort-tab {% if current_game == g %}active{% endif %}">{{ g }}</a>
+  {% endfor %}
+</div>
+
+{% if entries %}
+{% for e in entries %}
+<div class="card lb-entry">
+  <span class="lb-rank {% if loop.index == 1 %}gold{% elif loop.index == 2 %}silver{% elif loop.index == 3 %}bronze{% endif %}">
+    {% if loop.index == 1 %}&#129351;{% elif loop.index == 2 %}&#129352;{% elif loop.index == 3 %}&#129353;{% else %}{{ loop.index }}.{% endif %}
+  </span>
+  <a href="/profile/{{ e.username }}" class="post-username">{{ e.username }}</a>
+  {% if e.game is defined and e.game %}
+  <span class="post-meta">{{ e.game }}</span>
+  {% endif %}
+  <span class="lb-score">{{ e.score }} pts</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">No scores yet. Play some door games in the CLI!</span>
+</div>
+{% endif %}
+{% endblock %}

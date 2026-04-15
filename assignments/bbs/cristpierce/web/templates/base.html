@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}BBS Bustin'{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/theme.js"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="logo">BBS<span>://</span>Bustin'</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">boards</a>
+        <a href="/leaderboard" class="nav-link">scores</a>
+        {% if user %}
+          <a href="/inbox" class="nav-link" style="position:relative">
+            inbox
+            {% if unread > 0 %}
+              <span class="nav-badge">{{ unread }}</span>
+            {% endif %}
+          </a>
+          <a href="/profile/{{ user.username }}" class="nav-link">{{ user.username }}</a>
+          {% if user.role in ['admin', 'mod'] %}
+            <a href="/admin" class="nav-link text-amber">admin</a>
+          {% endif %}
+          <form action="/logout" method="post" style="display:inline">
+            <button type="submit" class="nav-link" style="background:none;border:none;cursor:pointer;font:inherit">logout</button>
+          </form>
+        {% else %}
+          <a href="/login" class="nav-link">login</a>
+        {% endif %}
+        <button class="theme-toggle" onclick="toggleTheme()">[ LIGHT ]</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast-area" class="toast-area"></div>
+  {% if user %}
+    <script src="/static/notifications.js"></script>
+  {% endif %}
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
