@@ -1,5 +1,5 @@
 """
-verify_api.py - conformance check for your BBS API.
+verify_api.py - conformance check for your BBS webserver.
 
 HOW TO USE:
   1. Start your server:   uvicorn main:app --port 8000
