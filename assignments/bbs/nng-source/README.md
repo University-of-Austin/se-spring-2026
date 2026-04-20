@@ -58,7 +58,13 @@ In the SQL version, the database engine handles the search with a `LIKE` query. 
 
 ## Migration Behavior
 
-When `migrate.py` runs, it **wipes existing data** in `bbs.db` (deletes all rows from `posts`, `boards`, and `users`) before inserting the migrated data. This ensures a clean, idempotent migration: running it multiple times always produces the same result. I chose this approach because the migration is meant to be a one-time conversion from JSON to SQLite, and wiping prevents duplicate entries if you accidentally run it twice. Thread reply relationships, board assignments, and user profiles from the JSON files are preserved with correctly mapped foreign keys.
+When `migrate.py` runs, it performs an **additive migration with duplicate-skipping**. It does not wipe the existing database. Instead:
+
+- Users and boards that already exist are reused (matched by username / board name).
+- A post is considered a duplicate if the same `username + message + timestamp` combination already exists in the DB. Duplicates are skipped.
+- New users, boards, and posts are inserted.
+
+This makes the migration idempotent: running it multiple times produces the same result (second run reports "0 posts added, N skipped"). I chose this over a destructive wipe because it lets you migrate a JSON export into a DB that may already contain other data without losing it, and because re-running the migration by accident is harmless. Thread reply relationships, board assignments, and user profiles from the JSON files are preserved with correctly mapped foreign keys.
 
 ## Silver Features
 
