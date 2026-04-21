@@ -1,1 +1,14 @@
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# SQLite databases
+*.db
+*.db-journal
+
+# Python virtualenvs
+.venv/
+venv/
