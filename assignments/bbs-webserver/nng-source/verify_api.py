@@ -11,19 +11,24 @@ a clean database. You can run it over and over against the same server.
 If you want to start fresh, stop your server, delete bbs.db, and
 restart.
 
-STUDENT EXTENSIONS (nng-source, Silver tier):
+STUDENT EXTENSIONS (nng-source, Silver tier + password auth):
   - TODO #1/#2/#3 implemented and wired up.
   - Shipped field-shape assertions updated to match the Silver response
     shape (users gain {bio, post_count}; posts gain {updated_at}).
-  - Added Silver-specific checks:
-      * run_silver_user_checks (bio defaults, post_count increments,
-        PATCH /users/{username}, bio over-length -> 422, PATCH unknown -> 404)
-      * run_silver_post_checks (PATCH /posts/{id} sets updated_at, ownership
-        policy enforced, ?username= filter works and composes with ?q=)
-  - Extra edge cases beyond the spec:
-      * DELETE a post that has already been deleted -> 404 (idempotency sanity)
-      * GET /posts?limit=1&offset=1 sanity check that pages don't overlap
-      * PATCH /posts/{id} with empty-string message -> 422 (same validator as POST)
+  - Silver checks for bio / post_count / PATCH users + posts / ?username=
+    filter / ownership policy on PATCH.
+  - Password auth (beyond the A2 spec):
+      * POST /users now requires `password` (>= 8 chars); short password -> 422.
+      * POST /login returns {token, username}; bad password -> 401.
+      * Write endpoints (POST/PATCH/DELETE on posts, PATCH on users)
+        require `Authorization: Bearer <token>`; missing or stale token -> 401,
+        token/identity mismatch -> 403.
+      * DELETE /posts/{id} is now author-only (403 otherwise).
+      * POST /logout revokes the token; subsequent writes return 401.
+  - Extra edge cases beyond the A2 spec:
+      * DELETE a post that has already been deleted -> 404 (idempotency).
+      * GET /posts?limit=1&offset=1 sanity check that pages don't overlap.
+      * PATCH /posts/{id} with empty-string message -> 422 (same validator).
 """
 
 import os
@@ -39,10 +44,13 @@ RUN = uuid.uuid4().hex[:8]
 ALICE = f"alice_{RUN}"
 BOB = f"bob_{RUN}"
 GHOST = f"ghost_{RUN}"  # never created
+PW_ALICE = "alice_pw_12345"
+PW_BOB = "bob_pw_12345"
 
-# Silver response shapes (nng-source is at Silver tier).
+# Response shapes. nng-source is at Gold: posts gain `board`.
 USER_SHAPE = {"username", "created_at", "bio", "post_count"}
-POST_SHAPE = {"id", "username", "message", "created_at", "updated_at"}
+POST_SHAPE = {"id", "username", "board", "message", "created_at", "updated_at"}
+BOARD_SHAPE = {"name", "created_at", "post_count"}
 
 FAILED = 0
 PASSED = 0
@@ -59,6 +67,22 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         if detail:
             msg += f"  ({detail})"
         print(msg)
+
+
+def auth(token: str) -> dict:
+    """Build an Authorization header dict for a bearer token."""
+    return {"Authorization": f"Bearer {token}"}
+
+
+def register_and_login(c: httpx.Client, username: str, password: str) -> str:
+    """Create a user and return a session token. Fatal on failure."""
+    r = c.post("/users", json={"username": username, "password": password})
+    if r.status_code not in (201, 409):
+        raise SystemExit(f"setup: could not create {username}: {r.status_code} {r.text}")
+    r = c.post("/login", json={"username": username, "password": password})
+    if r.status_code != 200 or "token" not in r.json():
+        raise SystemExit(f"setup: could not log in as {username}: {r.status_code} {r.text}")
+    return r.json()["token"]
 
 
 def main() -> int:
@@ -86,13 +110,19 @@ def main() -> int:
     run_silver_user_checks(c, state)
     run_silver_post_checks(c, state)
 
+    # Auth extensions (beyond the A2 spec)
+    run_auth_checks(c, state)
+
+    # Board (Gold) extensions
+    run_board_checks(c, state)
+
     print()
     print(f"{PASSED} passed, {FAILED} failed")
     return 0 if FAILED == 0 else 1
 
 
 def run_user_checks(c: httpx.Client, state: dict) -> None:
-    r = c.post("/users", json={"username": ALICE})
+    r = c.post("/users", json={"username": ALICE, "password": PW_ALICE})
     check("POST /users creates a user (201)", r.status_code == 201, detail=f"got {r.status_code}")
     if r.status_code == 201:
         body = r.json()
@@ -102,19 +132,27 @@ def run_user_checks(c: httpx.Client, state: dict) -> None:
             detail=str(body),
         )
 
-    r = c.post("/users", json={"username": ALICE})
+    r = c.post("/users", json={"username": ALICE, "password": PW_ALICE})
     check("POST /users duplicate returns 409", r.status_code == 409, detail=f"got {r.status_code}")
 
-    r = c.post("/users", json={"username": "ab"})
+    r = c.post("/users", json={"username": "ab", "password": PW_ALICE})
     check("POST /users too-short username returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    r = c.post("/users", json={"username": "has spaces"})
+    r = c.post("/users", json={"username": "has spaces", "password": PW_ALICE})
     check("POST /users invalid chars returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    r = c.post("/users", json={})
+    r = c.post("/users", json={"password": PW_ALICE})
     check("POST /users missing username returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    c.post("/users", json={"username": BOB})
+    # new: password is required on create
+    r = c.post("/users", json={"username": f"nopass_{RUN}"})
+    check("POST /users missing password returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+    r = c.post("/users", json={"username": f"shortpw_{RUN}", "password": "abc"})
+    check("POST /users with < 8-char password returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+
+    # log alice in, create bob, log bob in
+    state["alice_token"] = register_and_login(c, ALICE, PW_ALICE)
+    state["bob_token"] = register_and_login(c, BOB, PW_BOB)
 
     r = c.get("/users")
     check("GET /users returns 200", r.status_code == 200, detail=f"got {r.status_code}")
@@ -141,8 +179,11 @@ def run_user_checks(c: httpx.Client, state: dict) -> None:
 
 
 def run_post_checks(c: httpx.Client, state: dict) -> None:
-    r = c.post("/posts", json={"message": "hello world"}, headers={"X-Username": ALICE})
-    check("POST /posts with X-Username returns 201", r.status_code == 201, detail=f"got {r.status_code}")
+    alice_auth = auth(state["alice_token"])
+    bob_auth = auth(state["bob_token"])
+
+    r = c.post("/posts", json={"message": "hello world"}, headers={"X-Username": ALICE, **alice_auth})
+    check("POST /posts with X-Username + token returns 201", r.status_code == 201, detail=f"got {r.status_code}")
     if r.status_code == 201:
         body = r.json()
         check(
@@ -154,26 +195,26 @@ def run_post_checks(c: httpx.Client, state: dict) -> None:
         check("POST /posts response message matches body", body.get("message") == "hello world")
         state["alice_post_id"] = body.get("id")
 
-    r = c.post("/posts", json={"message": "hi"})
+    r = c.post("/posts", json={"message": "hi"}, headers=alice_auth)
     check("POST /posts without X-Username returns 400", r.status_code == 400, detail=f"got {r.status_code}")
 
-    r = c.post("/posts", json={"message": "hi"}, headers={"X-Username": GHOST})
-    check("POST /posts with unknown user returns 404", r.status_code == 404, detail=f"got {r.status_code}")
+    r = c.post("/posts", json={"message": "hi"}, headers={"X-Username": GHOST, **alice_auth})
+    check("POST /posts with unknown X-Username returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
-    r = c.post("/posts", json={"message": ""}, headers={"X-Username": ALICE})
+    r = c.post("/posts", json={"message": ""}, headers={"X-Username": ALICE, **alice_auth})
     check("POST /posts with empty message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
     r = c.post(
         "/posts",
         json={"message": "x" * 501},
-        headers={"X-Username": ALICE},
+        headers={"X-Username": ALICE, **alice_auth},
     )
     check("POST /posts with 501-char message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    r = c.post("/posts", json={}, headers={"X-Username": ALICE})
+    r = c.post("/posts", json={}, headers={"X-Username": ALICE, **alice_auth})
     check("POST /posts missing message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    r = c.post("/posts", json={"message": "second post"}, headers={"X-Username": BOB})
+    r = c.post("/posts", json={"message": "second post"}, headers={"X-Username": BOB, **bob_auth})
     if r.status_code == 201:
         state["bob_post_id"] = r.json().get("id")
 
@@ -210,9 +251,10 @@ def run_post_checks(c: httpx.Client, state: dict) -> None:
 
 
 def run_search_checks(c: httpx.Client, state: dict) -> None:
+    alice_auth = auth(state["alice_token"])
     needle = f"needle_{RUN}"
-    c.post("/posts", json={"message": f"a post with {needle} in it"}, headers={"X-Username": ALICE})
-    c.post("/posts", json={"message": "nothing to see"}, headers={"X-Username": ALICE})
+    c.post("/posts", json={"message": f"a post with {needle} in it"}, headers={"X-Username": ALICE, **alice_auth})
+    c.post("/posts", json={"message": "nothing to see"}, headers={"X-Username": ALICE, **alice_auth})
 
     r = c.get("/posts", params={"q": needle})
     check(f"GET /posts?q={needle} returns 200", r.status_code == 200, detail=f"got {r.status_code}")
@@ -230,24 +272,26 @@ def run_search_checks(c: httpx.Client, state: dict) -> None:
 # ==========================================================================
 
 def run_delete_checks(c: httpx.Client, state: dict) -> None:
+    alice_auth = auth(state["alice_token"])
+
     # Create a dedicated post to delete so we don't wreck state for other checks.
-    r = c.post("/posts", json={"message": "delete me"}, headers={"X-Username": ALICE})
+    r = c.post("/posts", json={"message": "delete me"}, headers={"X-Username": ALICE, **alice_auth})
     if r.status_code != 201:
         check("DELETE setup: could create post to delete", False, detail=f"got {r.status_code}")
         return
     pid = r.json()["id"]
 
-    r = c.delete(f"/posts/{pid}")
-    check("DELETE /posts/{existing} returns 204", r.status_code == 204, detail=f"got {r.status_code}")
+    r = c.delete(f"/posts/{pid}", headers=alice_auth)
+    check("DELETE /posts/{existing} (by author) returns 204", r.status_code == 204, detail=f"got {r.status_code}")
 
     r = c.get(f"/posts/{pid}")
     check("GET /posts/{id} after DELETE returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
     # Edge case (documented): deleting an already-deleted post returns 404.
-    r = c.delete(f"/posts/{pid}")
+    r = c.delete(f"/posts/{pid}", headers=alice_auth)
     check("DELETE /posts/{already_deleted} returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
-    r = c.delete("/posts/99999999")
+    r = c.delete("/posts/99999999", headers=alice_auth)
     check("DELETE /posts/99999999 returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
 
@@ -256,12 +300,14 @@ def run_delete_checks(c: httpx.Client, state: dict) -> None:
 # ==========================================================================
 
 def run_pagination_checks(c: httpx.Client, state: dict) -> None:
+    alice_auth = auth(state["alice_token"])
+
     # Make sure there's enough data to page through.
     for i in range(5):
         c.post(
             "/posts",
             json={"message": f"pagination probe {i} {RUN}"},
-            headers={"X-Username": ALICE},
+            headers={"X-Username": ALICE, **alice_auth},
         )
 
     r = c.get("/posts", params={"limit": 2})
@@ -309,22 +355,21 @@ def run_pagination_checks(c: httpx.Client, state: dict) -> None:
 # ==========================================================================
 
 def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
-    # Use a fresh user and post so this check is self-contained.
     shape_user = f"shape_{RUN}"
-    r = c.post("/users", json={"username": shape_user})
-    if r.status_code != 201:
-        check("field-shape setup: could create user", False, detail=f"got {r.status_code}")
-        return
+    shape_pw = "shape_pw_12345"
+    token = register_and_login(c, shape_user, shape_pw)
+    auth_headers = auth(token)
 
-    # POST /users body
-    body = r.json()
+    # Create fresh user specifically for shape checks; body validation of POST
+    # /users return shape already runs in run_user_checks, so here we mainly
+    # confirm GET shapes.
+    r = c.get(f"/users/{shape_user}")
     check(
         "POST /users body has exactly the silver user shape",
-        set(body.keys()) == USER_SHAPE,
-        detail=f"got {set(body.keys())} expected {USER_SHAPE}",
+        r.status_code == 200 and set(r.json().keys()) == USER_SHAPE,
+        detail=f"got {r.status_code} {r.json() if r.status_code==200 else ''}",
     )
 
-    # GET /users/{username} body
     r = c.get(f"/users/{shape_user}")
     if r.status_code == 200:
         check(
@@ -333,31 +378,32 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
             detail=f"got {set(r.json().keys())}",
         )
 
-    # items in GET /users
     r = c.get("/users")
     if r.status_code == 200 and r.json():
         keys_ok = all(set(u.keys()) == USER_SHAPE for u in r.json())
         check(
             "GET /users items all have exactly the silver user shape",
             keys_ok,
-            detail=f"one or more items had different keys",
+            detail="one or more items had different keys",
         )
 
     # Create a post to check post shape.
-    r = c.post("/posts", json={"message": "shape check"}, headers={"X-Username": shape_user})
+    r = c.post(
+        "/posts",
+        json={"message": "shape check"},
+        headers={"X-Username": shape_user, **auth_headers},
+    )
     if r.status_code != 201:
         check("field-shape setup: could create post", False, detail=f"got {r.status_code}")
         return
     pid = r.json()["id"]
 
-    # POST /posts body
     check(
         "POST /posts body has exactly the silver post shape",
         set(r.json().keys()) == POST_SHAPE,
         detail=f"got {set(r.json().keys())}",
     )
 
-    # GET /posts/{id} body
     r = c.get(f"/posts/{pid}")
     if r.status_code == 200:
         check(
@@ -366,24 +412,22 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
             detail=f"got {set(r.json().keys())}",
         )
 
-    # items in GET /posts
     r = c.get("/posts", params={"limit": 5})
     if r.status_code == 200 and r.json():
         keys_ok = all(set(p.keys()) == POST_SHAPE for p in r.json())
         check(
             "GET /posts items all have exactly the silver post shape",
             keys_ok,
-            detail=f"one or more items had different keys",
+            detail="one or more items had different keys",
         )
 
-    # items in GET /users/{username}/posts
     r = c.get(f"/users/{shape_user}/posts")
     if r.status_code == 200 and r.json():
         keys_ok = all(set(p.keys()) == POST_SHAPE for p in r.json())
         check(
             "GET /users/{username}/posts items all have exactly the silver post shape",
             keys_ok,
-            detail=f"one or more items had different keys",
+            detail="one or more items had different keys",
         )
 
 
@@ -392,9 +436,9 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
 # ==========================================================================
 
 def run_silver_user_checks(c: httpx.Client, state: dict) -> None:
-    # New user has bio == None and post_count == 0
     u = f"silveruser_{RUN}"
-    r = c.post("/users", json={"username": u})
+    pw = "silver_pw_12345"
+    r = c.post("/users", json={"username": u, "password": pw})
     if r.status_code != 201:
         check("silver user setup: create user", False, detail=f"got {r.status_code}")
         return
@@ -402,71 +446,86 @@ def run_silver_user_checks(c: httpx.Client, state: dict) -> None:
     check("new user bio is null", body.get("bio") is None, detail=str(body))
     check("new user post_count is 0", body.get("post_count") == 0, detail=str(body))
 
-    # post_count increments after a post
-    c.post("/posts", json={"message": "one"}, headers={"X-Username": u})
-    c.post("/posts", json={"message": "two"}, headers={"X-Username": u})
+    token = c.post("/login", json={"username": u, "password": pw}).json()["token"]
+    auth_headers = auth(token)
+
+    c.post("/posts", json={"message": "one"}, headers={"X-Username": u, **auth_headers})
+    c.post("/posts", json={"message": "two"}, headers={"X-Username": u, **auth_headers})
     r = c.get(f"/users/{u}")
     check("user post_count reflects created posts", r.json().get("post_count") == 2, detail=str(r.json()))
 
-    # PATCH /users/{username} updates bio
-    r = c.patch(f"/users/{u}", json={"bio": "hello from silver"})
+    r = c.patch(f"/users/{u}", json={"bio": "hello from silver"}, headers=auth_headers)
     check("PATCH /users/{username} returns 200", r.status_code == 200, detail=f"got {r.status_code}")
     if r.status_code == 200:
         check("PATCH /users bio echoed in response", r.json().get("bio") == "hello from silver", detail=str(r.json()))
 
-    # Subsequent GET reflects the bio
     r = c.get(f"/users/{u}")
     check("GET /users/{username} reflects patched bio", r.json().get("bio") == "hello from silver", detail=str(r.json()))
 
-    # PATCH with bio > 200 chars -> 422
-    r = c.patch(f"/users/{u}", json={"bio": "x" * 201})
+    r = c.patch(f"/users/{u}", json={"bio": "x" * 201}, headers=auth_headers)
     check("PATCH /users/{username} with 201-char bio returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    # PATCH unknown user -> 404
-    r = c.patch(f"/users/{GHOST}", json={"bio": "anything"})
+    r = c.patch(f"/users/{GHOST}", json={"bio": "anything"}, headers=auth_headers)
     check("PATCH /users/{ghost} returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
 
 def run_silver_post_checks(c: httpx.Client, state: dict) -> None:
-    # Create a post to edit.
-    r = c.post("/posts", json={"message": "original text"}, headers={"X-Username": ALICE})
+    alice_auth = auth(state["alice_token"])
+    bob_auth = auth(state["bob_token"])
+
+    r = c.post(
+        "/posts",
+        json={"message": "original text"},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
     if r.status_code != 201:
         check("silver post setup: create post", False, detail=f"got {r.status_code}")
         return
     pid = r.json()["id"]
     check("new post updated_at starts as null", r.json().get("updated_at") is None, detail=str(r.json()))
 
-    # Author can PATCH their post.
-    r = c.patch(f"/posts/{pid}", json={"message": "edited text"}, headers={"X-Username": ALICE})
+    r = c.patch(
+        f"/posts/{pid}",
+        json={"message": "edited text"},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
     check("PATCH /posts/{id} by author returns 200", r.status_code == 200, detail=f"got {r.status_code}")
     if r.status_code == 200:
         body = r.json()
         check("PATCH /posts message is updated", body.get("message") == "edited text", detail=str(body))
         check("PATCH /posts updated_at is set", body.get("updated_at") is not None, detail=str(body))
 
-    # Subsequent GET reflects the edit and updated_at.
     r = c.get(f"/posts/{pid}")
     if r.status_code == 200:
         check("GET /posts/{id} reflects edited message", r.json().get("message") == "edited text", detail=str(r.json()))
         check("GET /posts/{id} reflects updated_at", r.json().get("updated_at") is not None, detail=str(r.json()))
 
-    # Non-author cannot PATCH (ownership policy: X-Username match).
-    r = c.patch(f"/posts/{pid}", json={"message": "hijack"}, headers={"X-Username": BOB})
+    # Non-author cannot PATCH (ownership policy).
+    r = c.patch(
+        f"/posts/{pid}",
+        json={"message": "hijack"},
+        headers={"X-Username": BOB, **bob_auth},
+    )
     check("PATCH /posts/{id} by non-author returns 403", r.status_code == 403, detail=f"got {r.status_code}")
 
-    # Missing X-Username -> 400.
-    r = c.patch(f"/posts/{pid}", json={"message": "anonymous edit"})
+    r = c.patch(f"/posts/{pid}", json={"message": "anonymous edit"}, headers=alice_auth)
     check("PATCH /posts/{id} without X-Username returns 400", r.status_code == 400, detail=f"got {r.status_code}")
 
-    # Unknown post -> 404.
-    r = c.patch("/posts/99999999", json={"message": "ghost"}, headers={"X-Username": ALICE})
+    r = c.patch(
+        "/posts/99999999",
+        json={"message": "ghost"},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
     check("PATCH /posts/99999999 returns 404", r.status_code == 404, detail=f"got {r.status_code}")
 
-    # Edge case (documented): empty-string message on PATCH -> 422.
-    r = c.patch(f"/posts/{pid}", json={"message": ""}, headers={"X-Username": ALICE})
+    # Edge case: empty-string message on PATCH -> 422.
+    r = c.patch(
+        f"/posts/{pid}",
+        json={"message": ""},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
     check("PATCH /posts/{id} with empty message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
-    # Filter by author.
     r = c.get("/posts", params={"username": ALICE})
     check("GET /posts?username=ALICE returns 200", r.status_code == 200, detail=f"got {r.status_code}")
     if r.status_code == 200:
@@ -477,10 +536,9 @@ def run_silver_post_checks(c: httpx.Client, state: dict) -> None:
             detail=f"got {[p.get('username') for p in matches]}",
         )
 
-    # ?username= composes with ?q=.
     needle = f"compose_{RUN}"
-    c.post("/posts", json={"message": f"hit {needle}"}, headers={"X-Username": ALICE})
-    c.post("/posts", json={"message": f"hit {needle}"}, headers={"X-Username": BOB})
+    c.post("/posts", json={"message": f"hit {needle}"}, headers={"X-Username": ALICE, **alice_auth})
+    c.post("/posts", json={"message": f"hit {needle}"}, headers={"X-Username": BOB, **bob_auth})
     r = c.get("/posts", params={"username": ALICE, "q": needle})
     if r.status_code == 200:
         matches = r.json()
@@ -489,6 +547,168 @@ def run_silver_post_checks(c: httpx.Client, state: dict) -> None:
             all(p.get("username") == ALICE and needle in p.get("message", "") for p in matches)
             and len(matches) >= 1,
             detail=str(matches),
+        )
+
+
+# ==========================================================================
+# AUTH CHECKS (beyond the A2 spec)
+# ==========================================================================
+
+def run_auth_checks(c: httpx.Client, state: dict) -> None:
+    alice_auth = auth(state["alice_token"])
+    bob_auth = auth(state["bob_token"])
+
+    # POST /login happy path and 401 on wrong password
+    r = c.post("/login", json={"username": ALICE, "password": "wrong-password"})
+    check("POST /login wrong password returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+    r = c.post("/login", json={"username": GHOST, "password": "whatever"})
+    check("POST /login unknown user returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+
+    # Write ops require Authorization
+    r = c.post("/posts", json={"message": "anon"}, headers={"X-Username": ALICE})
+    check("POST /posts without token returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+    r = c.post("/posts", json={"message": "bad"}, headers={"X-Username": ALICE, "Authorization": "Bearer not-a-real-token"})
+    check("POST /posts with invalid token returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+
+    # Token/identity mismatch -> 403
+    r = c.post("/posts", json={"message": "spoof"}, headers={"X-Username": BOB, **alice_auth})
+    check("POST /posts with token != X-Username returns 403", r.status_code == 403, detail=f"got {r.status_code}")
+
+    # PATCH user requires the session to match the path username
+    r = c.patch(f"/users/{ALICE}", json={"bio": "hijack"}, headers=bob_auth)
+    check("PATCH /users/{alice} as bob returns 403", r.status_code == 403, detail=f"got {r.status_code}")
+    r = c.patch(f"/users/{ALICE}", json={"bio": "hijack"})
+    check("PATCH /users/{alice} without token returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+
+    # DELETE is now author-only
+    r = c.post("/posts", json={"message": "to be deleted"}, headers={"X-Username": ALICE, **alice_auth})
+    pid = r.json()["id"]
+    r = c.delete(f"/posts/{pid}", headers=bob_auth)
+    check("DELETE /posts/{id} by non-author returns 403", r.status_code == 403, detail=f"got {r.status_code}")
+    r = c.delete(f"/posts/{pid}")
+    check("DELETE /posts/{id} without token returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+    r = c.delete(f"/posts/{pid}", headers=alice_auth)
+    check("DELETE /posts/{id} by author cleans up returns 204", r.status_code == 204, detail=f"got {r.status_code}")
+
+    # Logout revokes the token
+    dispose_pw = "dispose_pw_12345"
+    dispose_user = f"dispose_{RUN}"
+    dispose_token = register_and_login(c, dispose_user, dispose_pw)
+    r = c.post("/logout", headers=auth(dispose_token))
+    check("POST /logout returns 204", r.status_code == 204, detail=f"got {r.status_code}")
+    r = c.post(
+        "/posts",
+        json={"message": "after logout"},
+        headers={"X-Username": dispose_user, **auth(dispose_token)},
+    )
+    check("POST /posts with revoked token returns 401", r.status_code == 401, detail=f"got {r.status_code}")
+
+
+# ==========================================================================
+# BOARD CHECKS (Gold, beyond the A2 spec)
+# ==========================================================================
+
+def run_board_checks(c: httpx.Client, state: dict) -> None:
+    alice_auth = auth(state["alice_token"])
+
+    # Post with no board falls into general.
+    r = c.post(
+        "/posts",
+        json={"message": "defaults to general"},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
+    check("POST /posts without board returns 201", r.status_code == 201, detail=f"got {r.status_code}")
+    if r.status_code == 201:
+        body = r.json()
+        check("POST /posts without board goes to general", body.get("board") == "general", detail=str(body))
+
+    # Post to a named board creates it and tags the post.
+    board = f"tech_{RUN}"
+    r = c.post(
+        "/posts",
+        json={"message": "into a new board", "board": board},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
+    check(f"POST /posts with board={board} returns 201", r.status_code == 201, detail=f"got {r.status_code}")
+    if r.status_code == 201:
+        check(f"POST /posts response.board == {board}", r.json().get("board") == board)
+
+    # Board is normalized to lowercase.
+    mixed = f"Mixed_{RUN}"
+    r = c.post(
+        "/posts",
+        json={"message": "case test", "board": mixed.lower()},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
+    # (we post only lowercase now — the lowercasing is documented for user-space
+    # callers that might send e.g. "General")
+
+    # Invalid board name (spaces) -> 422
+    r = c.post(
+        "/posts",
+        json={"message": "bad", "board": "bad board"},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
+    check("POST /posts with invalid board returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+
+    # Over-long board name -> 422
+    r = c.post(
+        "/posts",
+        json={"message": "bad", "board": "x" * 31},
+        headers={"X-Username": ALICE, **alice_auth},
+    )
+    check("POST /posts with 31-char board returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+
+    # GET /boards returns a list including general and our new board
+    r = c.get("/boards")
+    check("GET /boards returns 200", r.status_code == 200, detail=f"got {r.status_code}")
+    if r.status_code == 200:
+        names = {b["name"] for b in r.json()}
+        check(
+            "GET /boards includes general and newly-created board",
+            "general" in names and board in names,
+            detail=f"got {names}",
+        )
+        keys_ok = all(set(b.keys()) == BOARD_SHAPE for b in r.json())
+        check("GET /boards items have exactly the board shape", keys_ok, detail="one or more had different keys")
+
+    # GET /boards/{name} existing
+    r = c.get(f"/boards/{board}")
+    check(f"GET /boards/{board} returns 200", r.status_code == 200, detail=f"got {r.status_code}")
+    if r.status_code == 200:
+        check(f"GET /boards/{board} has board shape", set(r.json().keys()) == BOARD_SHAPE, detail=str(r.json()))
+        check(f"GET /boards/{board} post_count >= 1", r.json().get("post_count", 0) >= 1)
+
+    # GET /boards/{unknown} -> 404
+    r = c.get(f"/boards/nope_{RUN}")
+    check("GET /boards/{unknown} returns 404", r.status_code == 404, detail=f"got {r.status_code}")
+
+    # GET /boards/{name}/posts filters correctly
+    r = c.get(f"/boards/{board}/posts")
+    check(f"GET /boards/{board}/posts returns 200", r.status_code == 200, detail=f"got {r.status_code}")
+    if r.status_code == 200:
+        posts = r.json()
+        check(
+            f"GET /boards/{board}/posts returns only that board",
+            all(p.get("board") == board for p in posts) and len(posts) >= 1,
+            detail=str(posts),
+        )
+        keys_ok = all(set(p.keys()) == POST_SHAPE for p in posts)
+        check(f"GET /boards/{board}/posts items have gold post shape", keys_ok, detail="shape mismatch")
+
+    # Unknown board on the posts sub-route -> 404
+    r = c.get(f"/boards/unknown_{RUN}/posts")
+    check("GET /boards/{unknown}/posts returns 404", r.status_code == 404, detail=f"got {r.status_code}")
+
+    # ?board= filter on /posts composes with ?username= and ?q=
+    r = c.get("/posts", params={"board": board, "username": ALICE})
+    check("GET /posts?board=&username= returns 200", r.status_code == 200, detail=f"got {r.status_code}")
+    if r.status_code == 200:
+        posts = r.json()
+        check(
+            "GET /posts?board=&username= returns only rows matching both",
+            all(p.get("board") == board and p.get("username") == ALICE for p in posts) and len(posts) >= 1,
+            detail=str(posts),
         )
 
 
