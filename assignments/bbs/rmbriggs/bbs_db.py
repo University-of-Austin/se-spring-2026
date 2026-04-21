@@ -323,6 +323,8 @@ def interactive_mode():
     if not username:
         print("Username cannot be empty.")
         sys.exit(1)
+    with engine.begin() as conn:
+        get_or_create_user(conn, username)
     console.print(f"Welcome, [bold cyan]{username}[/bold cyan]! Type 'help' for commands.\n")
 
     while True:
