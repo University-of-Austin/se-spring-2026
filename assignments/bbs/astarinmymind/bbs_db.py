@@ -93,21 +93,33 @@ def get_or_create_user(conn, username: str) -> int:
     return result.lastrowid
 
 
-def post_message(username: str, message: str):
-    """Post a new message to the board and print it."""
-    with engine.connect() as conn:
-        # Step 1: Get the user's ID (creating them if needed)
-        user_id = get_or_create_user(conn, username)
+def insert_post(conn, user_id: int, message: str) -> str:
+    """Insert a post into the database. Returns the timestamp string."""
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        text("""
+            INSERT INTO posts (user_id, message, timestamp)
+            VALUES (:user_id, :message, :timestamp)
+        """),
+        {"user_id": user_id, "message": message, "timestamp": timestamp}
+    )
+    return timestamp
 
-        # Step 2: Insert the post with current timestamp
-        timestamp = datetime.now().isoformat(timespec="seconds")
-        conn.execute(
-            text("""
-                INSERT INTO posts (user_id, message, timestamp)
-                VALUES (:user_id, :message, :timestamp)
-            """),
-            {"user_id": user_id, "message": message, "timestamp": timestamp}
-        )
+
+def update_flair(conn, username: str, emoji: str) -> int:
+    """Update a user's flair emoji. Returns number of rows changed."""
+    result = conn.execute(
+        text("UPDATE users SET flair = :flair WHERE username = :username"),
+        {"flair": emoji, "username": username}
+    )
+    return result.rowcount
+
+
+def post_message(username: str, message: str):
+    """Post a new message to the board and print it (CLI entry point)."""
+    with engine.connect() as conn:
+        user_id = get_or_create_user(conn, username)
+        timestamp = insert_post(conn, user_id, message)
         conn.commit()
 
     print("Posted.")
@@ -118,15 +130,12 @@ def post_message(username: str, message: str):
 
 
 def set_flair(username: str, emoji: str):
-    """Set a user's flair emoji."""
+    """Set a user's flair emoji (CLI entry point)."""
     with engine.connect() as conn:
-        result = conn.execute(
-            text("UPDATE users SET flair = :flair WHERE username = :username"),
-            {"flair": emoji, "username": username}
-        )
+        rows = update_flair(conn, username, emoji)
         conn.commit()
 
-        if result.rowcount == 0:
+        if rows == 0:
             print(f"User '{username}' not found.")
         else:
             print(f"Flair set to {emoji} for {username}.")

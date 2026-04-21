@@ -2,8 +2,8 @@
 
 from flask import Flask, request, redirect
 from datetime import datetime
-from sqlalchemy import text
 from db import engine, init_db
+from bbs_db import get_or_create_user, update_flair, insert_post
 from printer import print_post
 
 app = Flask(__name__)
@@ -61,22 +61,6 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def get_or_create_user(conn, username: str) -> int:
-    result = conn.execute(
-        text("SELECT id FROM users WHERE username = :username"),
-        {"username": username}
-    )
-    row = result.fetchone()
-    if row:
-        return row[0]
-    result = conn.execute(
-        text("INSERT INTO users (username) VALUES (:username)"),
-        {"username": username}
-    )
-    conn.commit()
-    return result.lastrowid
-
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     message = ""
@@ -94,20 +78,12 @@ def index():
         if username and msg:
             with engine.connect() as conn:
                 user_id = get_or_create_user(conn, username)
-                # Update flair if provided
                 if flair:
-                    conn.execute(
-                        text("UPDATE users SET flair = :flair WHERE id = :user_id"),
-                        {"flair": flair, "user_id": user_id}
-                    )
-                timestamp = datetime.now().isoformat(timespec="seconds")
-                conn.execute(
-                    text("INSERT INTO posts (user_id, message, timestamp) VALUES (:user_id, :message, :timestamp)"),
-                    {"user_id": user_id, "message": msg, "timestamp": timestamp}
-                )
+                    update_flair(conn, username, flair)
+                timestamp = insert_post(conn, user_id, msg)
                 conn.commit()
 
-            # Print it with flair
+            # Print to thermal printer
             formatted_time = datetime.fromisoformat(timestamp).strftime("%Y-%m-%d %H:%M")
             display_name = f"{username} {flair}" if flair else username
             print_post(display_name, msg, formatted_time)
