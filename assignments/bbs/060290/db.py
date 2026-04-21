@@ -26,16 +26,6 @@ def init_db():
         column_names = [c[1] for c in columns]
         if "bio" not in column_names:
             conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
-        # Visit counter for welcome screen frames
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS visit_counter (
-                current_frame INTEGER
-            )
-        """))
-        row = conn.execute(text("SELECT COUNT(*) FROM visit_counter")).fetchone()
-        if row[0] == 0:
-            conn.execute(text("INSERT INTO visit_counter (current_frame) VALUES (:frame)"),
-                         {"frame": 1})
 
 
 if __name__ == "__main__":
