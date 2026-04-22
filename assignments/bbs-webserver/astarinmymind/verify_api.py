@@ -116,7 +116,7 @@ def main() -> int:
     #
     # When you've implemented it, uncomment the call below.
     # ==================================================================
-    # run_field_shape_checks(c, state)
+    run_field_shape_checks(c, state)
 
     print()
     print(f"{PASSED} passed, {FAILED} failed")
@@ -329,10 +329,116 @@ def run_pagination_checks(c: httpx.Client, state: dict) -> None:
 
 
 def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
-    # STUDENT TODO #3: implement this function. See the comment above for
-    # the full spec. Assert that each response body has EXACTLY the
-    # expected set of keys (set equality, not a subset check).
-    raise NotImplementedError("student must implement run_field_shape_checks")
+    # @AIANDY, we wrote each check inline first, noticed the repetition,
+    # then pulled out check_keys(). List endpoints still loop explicitly
+    # since they need to check every item.
+    expected_user_keys = {"username", "created_at"}
+    expected_post_keys = {"id", "username", "message", "created_at"}
+
+    def check_keys(label: str, status: int, obj: dict, expected: set) -> None:
+        """Check that a single response object has exactly the expected keys."""
+        keys = set(obj.keys())
+        check(label, keys == expected,
+              detail=f"status {status}, keys={keys}")
+
+    # --- POST /users: response should have exactly {username, created_at} ---
+    shape_user = f"shapeuser_{RUN}"
+    r = c.post("/users", json={"username": shape_user})
+    check_keys("POST /users response has exactly {username, created_at}",
+               r.status_code, r.json(), expected_user_keys)
+
+    # --- GET /users/{username}: response should have exactly {username, created_at} ---
+    r = c.get(f"/users/{shape_user}")
+    check_keys("GET /users/{username} response has exactly {username, created_at}",
+               r.status_code, r.json(), expected_user_keys)
+
+    # --- GET /users: each item should have exactly {username, created_at} ---
+    r = c.get("/users")
+    users = r.json()
+    bad_keys = [set(u.keys()) for u in users if set(u.keys()) != expected_user_keys]
+    check(
+        "GET /users items have exactly {username, created_at}",
+        r.status_code == 200 and len(users) > 0 and len(bad_keys) == 0,
+        detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
+    )
+
+    # POST /posts: response should have exactly {id, username, message, created_at}
+    r = c.post("/posts", json={"message": "shape test"},
+               headers={"X-Username": shape_user})
+    post_body = r.json()
+    check_keys("POST /posts response has exactly {id, username, message, created_at}",
+               r.status_code, post_body, expected_post_keys)
+
+    # GET /posts/{id}: response should have exactly {id, username, message, created_at}
+    post_id = post_body["id"]
+    r = c.get(f"/posts/{post_id}")
+    check_keys("GET /posts/{{id}} response has exactly {id, username, message, created_at}",
+               r.status_code, r.json(), expected_post_keys)
+
+    # GET /posts: each item should have exactly {id, username, message, created_at}
+    r = c.get("/posts")
+    posts = r.json()
+    bad_keys = [set(p.keys()) for p in posts if set(p.keys()) != expected_post_keys]
+    check(
+        "GET /posts items have exactly {id, username, message, created_at}",
+        r.status_code == 200 and len(posts) > 0 and len(bad_keys) == 0,
+        detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
+    )
+
+    # GET /users/{username}/posts: each item should have exactly {id, username, message, created_at}
+    # 
+    # @AIANDY, the spec's field shape requirements only mention POST/GET /posts
+    # and POST/GET /users, but /users/{username}/posts also returns post objects.
+    # Added this check since it could leak extra fields through a different code path.
+    r = c.get(f"/users/{shape_user}/posts")
+    user_posts = r.json()
+    bad_keys = [set(p.keys()) for p in user_posts if set(p.keys()) != expected_post_keys]
+    check(
+        "GET /users/{username}/posts items have exactly {id, username, message, created_at}",
+        r.status_code == 200 and len(user_posts) > 0 and len(bad_keys) == 0,
+        detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
+    )
+
+    # @AIANDY, we didn't add field shape checks for query param variations
+    # (?q=, ?limit=, ?offset=). They all share the same query and handler as
+    # GET /posts, so the plain list check above already covers the field shape.
+    # Testing each variation separately would be pure duplication.
+
+    # --- Error response shape checks ---
+    # @AIANDY, your verifier checks status codes but not the error body shape.
+    # 400, 404, 409 are our custom HTTPException calls, so worth verifying we
+    # didn't accidentally add extra fields. 422 is FastAPI-generated and its
+    # detail value is a list of validation errors rather than a string, but
+    # either way the body should still have exactly {detail} as the only key.
+    #
+    # We only test one representative case per status code since all errors of
+    # the same code go through the same HTTPException / Pydantic path.
+    expected_error_keys = {"detail"}
+
+    # 404 - nonexistent user
+    r = c.get(f"/users/{GHOST}")
+    check_keys("404 error body has exactly {detail} (GET /users/ghost)",
+               r.status_code, r.json(), expected_error_keys)
+
+    # 404 - nonexistent post
+    r = c.get("/posts/99999999")
+    check_keys("404 error body has exactly {detail} (GET /posts/99999999)",
+               r.status_code, r.json(), expected_error_keys)
+
+    # 400 - missing X-Username header
+    r = c.post("/posts", json={"message": "no header"})
+    check_keys("400 error body has exactly {detail} (POST /posts no header)",
+               r.status_code, r.json(), expected_error_keys)
+
+    # 409 - duplicate username
+    r = c.post("/users", json={"username": shape_user})
+    check_keys("409 error body has exactly {detail} (POST /users duplicate)",
+               r.status_code, r.json(), expected_error_keys)
+
+    # 422 - validation failure
+    r = c.post("/users", json={"username": "ab"})
+    check_keys("422 error body has exactly {detail} (POST /users too short)",
+               r.status_code, r.json(), expected_error_keys)
 
 
 if __name__ == "__main__":
