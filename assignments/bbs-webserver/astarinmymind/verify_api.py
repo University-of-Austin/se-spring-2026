@@ -147,6 +147,10 @@ def run_user_checks(c: httpx.Client, state: dict) -> None:
     r = c.post("/users", json={})
     check("POST /users missing username returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
+    # Boundary: exactly 3 chars is the minimum valid username
+    r = c.post("/users", json={"username": f"u{RUN[:2]}"})
+    check("POST /users 3-char username returns 201", r.status_code == 201, detail=f"got {r.status_code}")
+
     c.post("/users", json={"username": BOB})
 
     r = c.get("/users")
@@ -204,6 +208,10 @@ def run_post_checks(c: httpx.Client, state: dict) -> None:
     )
     check("POST /posts with 501-char message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
+    # Boundary: exactly 500 chars is the max valid message
+    r = c.post("/posts", json={"message": "x" * 500}, headers={"X-Username": ALICE})
+    check("POST /posts with 500-char message returns 201", r.status_code == 201, detail=f"got {r.status_code}")
+
     r = c.post("/posts", json={}, headers={"X-Username": ALICE})
     check("POST /posts missing message returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
@@ -258,6 +266,19 @@ def run_search_checks(c: httpx.Client, state: dict) -> None:
             detail=str(matches),
         )
 
+    # Search with no matches returns 200 + empty array, not 404
+    # @AIANDY, 200 + [] vs 404 are different semantics. 404 means "this
+    # resource doesn't exist" (like /posts/99999 for a post never created).
+    # An empty search result isn't a missing resource, it's a successful
+    # query that found nothing. If the API returns 404 for no matches,
+    # clients can't tell "bad URL" from "nothing matched your filter."
+    r = c.get("/posts", params={"q": "zzz_nomatch_zzz"})
+    check(
+        "GET /posts?q= with no matches returns 200 + empty array",
+        r.status_code == 200 and r.json() == [],
+        detail=f"status {r.status_code}, body={r.json()}",
+    )
+
 
 def run_delete_checks(c: httpx.Client, state: dict) -> None:
     # Create a fresh post just for this section so we can delete it without
@@ -265,12 +286,22 @@ def run_delete_checks(c: httpx.Client, state: dict) -> None:
     r = c.post("/posts", json={"message": "to be deleted"}, headers={"X-Username": ALICE})
     doomed_id = r.json()["id"]
 
-    # DELETE on an existing post returns 204
+    # DELETE on an existing post returns 204 with empty body
+    # @AIANDY, 204 means "No Content" - if the endpoint accidentally returns
+    # JSON on a 204, some HTTP clients will error, proxies/CDNs like nginx may
+    # strip or mangle the body, and frontend fetch libraries like axios will
+    # throw when calling .json() on an empty response. Works fine locally but
+    # breaks in production behind a reverse proxy.
     r = c.delete(f"/posts/{doomed_id}")
     check(
         f"DELETE /posts/{doomed_id} returns 204",
         r.status_code == 204,
         detail=f"got {r.status_code}",
+    )
+    check(
+        f"DELETE /posts/{doomed_id} has empty body",
+        r.content == b"",
+        detail=f"got {len(r.content)} bytes",
     )
 
     # After DELETE, GET on the same id returns 404
@@ -489,6 +520,14 @@ def run_silver_checks(c: httpx.Client, state: dict) -> None:
         detail=f"got {r.status_code}",
     )
 
+    # PATCH with bio at exactly 200 chars succeeds (boundary check)
+    r = c.patch(f"/users/{silver_user}", json={"bio": "b" * 200})
+    check(
+        "PATCH /users/{username} bio at exactly 200 chars returns 200",
+        r.status_code == 200,
+        detail=f"got {r.status_code}",
+    )
+
     # --- bio and post_count value checks ---
 
     # New user starts with bio=null and post_count=0
@@ -516,11 +555,30 @@ def run_silver_checks(c: httpx.Client, state: dict) -> None:
         detail=f"got post_count={r.json().get('post_count')}",
     )
 
+    # After deleting a post, post_count should decrease
+    r = c.post("/posts", json={"message": "to delete"}, headers={"X-Username": fresh_user})
+    delete_id = r.json()["id"]
+    c.delete(f"/posts/{delete_id}")
+    r = c.get(f"/users/{fresh_user}")
+    check(
+        "post_count decreases after deleting a post",
+        r.json().get("post_count") == 2,
+        detail=f"got post_count={r.json().get('post_count')}",
+    )
+
     # --- PATCH /posts/{id}: edit message ---
 
     # Create a post to edit
     r = c.post("/posts", json={"message": "original"}, headers={"X-Username": silver_user})
     edit_post_id = r.json()["id"]
+
+    # Fresh post should have updated_at=null before any edit
+    body = r.json()
+    check(
+        "Fresh post has updated_at=null before any edit",
+        body.get("updated_at") is None,
+        detail=f"got updated_at={body.get('updated_at')}",
+    )
 
     # PATCH with valid message returns 200
     r = c.patch(f"/posts/{edit_post_id}", json={"message": "edited"})
@@ -606,6 +664,17 @@ def run_silver_checks(c: httpx.Client, state: dict) -> None:
         r.status_code == 200
         and len(posts) >= 1
         and all(p["username"] == silver_user and "edited" in p["message"] for p in posts),
+        detail=f"status {r.status_code}, count={len(posts)}",
+    )
+
+    # Composable with pagination - ?username= and ?limit= work together
+    r = c.get("/posts", params={"username": silver_user, "limit": 1})
+    posts = r.json()
+    check(
+        "GET /posts?username=&limit=1 composes both filters",
+        r.status_code == 200
+        and len(posts) <= 1
+        and all(p["username"] == silver_user for p in posts),
         detail=f"status {r.status_code}, count={len(posts)}",
     )
 
