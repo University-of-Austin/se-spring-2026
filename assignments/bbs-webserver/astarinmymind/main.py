@@ -50,6 +50,20 @@ def get_user_by_username(username: str) -> dict:
     return user
 
 
+class UserUpdate(BaseModel):
+    # Spec: optional string, max 200 chars
+    bio: str = Field(max_length=200)
+
+
+@app.patch("/users/{username}")
+def update_user(username: str, payload: UserUpdate) -> dict:
+    with db.engine.connect() as conn:
+        user = db.update_user_bio(conn, username, payload.bio)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return user
+
+
 @app.get("/users/{username}/posts")
 def list_user_posts(username: str) -> list[dict]:
     with db.engine.connect() as conn:
@@ -84,11 +98,12 @@ def create_post(
 @app.get("/posts")
 def list_posts(
     q: str | None = Query(default=None),
+    username: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[dict]:
     with db.engine.connect() as conn:
-        return db.list_posts(conn, q=q, limit=limit, offset=offset)
+        return db.list_posts(conn, q=q, username=username, limit=limit, offset=offset)
 
 
 @app.get("/posts/{post_id}")
@@ -96,6 +111,20 @@ def get_post_by_id(post_id: int) -> dict:
     with db.engine.connect() as conn:
         post = db.get_post_by_id(conn, post_id)
     # db returned None - no post with that id
+    if post is None:
+        raise HTTPException(status_code=404, detail="post not found")
+    return post
+
+
+class PostUpdate(BaseModel):
+    # Spec: same validation as PostCreate
+    message: str = Field(min_length=1, max_length=500)
+
+
+@app.patch("/posts/{post_id}")
+def update_post(post_id: int, payload: PostUpdate) -> dict:
+    with db.engine.connect() as conn:
+        post = db.update_post_message(conn, post_id, payload.message)
     if post is None:
         raise HTTPException(status_code=404, detail="post not found")
     return post

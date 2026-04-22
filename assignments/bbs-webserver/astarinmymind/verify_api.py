@@ -102,10 +102,10 @@ def main() -> int:
     # No extras, nothing missing.
     #
     # A user object (from POST /users, GET /users/{username}, and items
-    # in GET /users) has exactly {username, created_at}.
+    # in GET /users) has exactly expected user fields.
     #
     # A post object (from POST /posts, GET /posts/{id}, and items in
-    # GET /posts) has exactly {id, username, message, created_at}.
+    # GET /posts) has exactly {id, username, message, created_at, updated_at}.
     #
     # An extra field like `email`, `updated_at`, or `user_id` is a FAIL.
     # A missing field is a FAIL. You will need to compare
@@ -117,6 +117,7 @@ def main() -> int:
     # When you've implemented it, uncomment the call below.
     # ==================================================================
     run_field_shape_checks(c, state)
+    run_silver_checks(c, state)
 
     print()
     print(f"{PASSED} passed, {FAILED} failed")
@@ -129,8 +130,8 @@ def run_user_checks(c: httpx.Client, state: dict) -> None:
     if r.status_code == 201:
         body = r.json()
         check(
-            "POST /users response has exactly username and created_at",
-            set(body.keys()) == {"username", "created_at"} and body["username"] == ALICE,
+            "POST /users response has exactly {username, created_at, bio, post_count}",
+            set(body.keys()) == {"username", "created_at", "bio", "post_count"} and body["username"] == ALICE,
             detail=str(body),
         )
 
@@ -177,9 +178,9 @@ def run_post_checks(c: httpx.Client, state: dict) -> None:
     check("POST /posts with X-Username returns 201", r.status_code == 201, detail=f"got {r.status_code}")
     if r.status_code == 201:
         body = r.json()
-        expected_keys = {"id", "username", "message", "created_at"}
+        expected_keys = {"id", "username", "message", "created_at", "updated_at"}
         check(
-            "POST /posts response has exactly id, username, message, created_at",
+            "POST /posts response has exactly id, username, message, created_at, updated_at",
             set(body.keys()) == expected_keys,
             detail=str(body),
         )
@@ -332,8 +333,8 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
     # @AIANDY, we wrote each check inline first, noticed the repetition,
     # then pulled out check_keys(). List endpoints still loop explicitly
     # since they need to check every item.
-    expected_user_keys = {"username", "created_at"}
-    expected_post_keys = {"id", "username", "message", "created_at"}
+    expected_user_keys = {"username", "created_at", "bio", "post_count"}
+    expected_post_keys = {"id", "username", "message", "created_at", "updated_at"}
 
     def check_keys(label: str, status: int, obj: dict, expected: set) -> None:
         """Check that a single response object has exactly the expected keys."""
@@ -341,51 +342,51 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
         check(label, keys == expected,
               detail=f"status {status}, keys={keys}")
 
-    # --- POST /users: response should have exactly {username, created_at} ---
+    # --- POST /users: response should have exactly {username, created_at, bio, post_count} ---
     shape_user = f"shapeuser_{RUN}"
     r = c.post("/users", json={"username": shape_user})
-    check_keys("POST /users response has exactly {username, created_at}",
+    check_keys("POST /users response has exactly {username, created_at, bio, post_count}",
                r.status_code, r.json(), expected_user_keys)
 
-    # --- GET /users/{username}: response should have exactly {username, created_at} ---
+    # --- GET /users/{username}: response should have exactly {username, created_at, bio, post_count} ---
     r = c.get(f"/users/{shape_user}")
-    check_keys("GET /users/{username} response has exactly {username, created_at}",
+    check_keys("GET /users/{username} response has exactly {username, created_at, bio, post_count}",
                r.status_code, r.json(), expected_user_keys)
 
-    # --- GET /users: each item should have exactly {username, created_at} ---
+    # --- GET /users: each item should have exactly {username, created_at, bio, post_count} ---
     r = c.get("/users")
     users = r.json()
     bad_keys = [set(u.keys()) for u in users if set(u.keys()) != expected_user_keys]
     check(
-        "GET /users items have exactly {username, created_at}",
+        "GET /users items have exactly {username, created_at, bio, post_count}",
         r.status_code == 200 and len(users) > 0 and len(bad_keys) == 0,
         detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
     )
 
-    # POST /posts: response should have exactly {id, username, message, created_at}
+    # POST /posts: response should have exactly {id, username, message, created_at, updated_at}
     r = c.post("/posts", json={"message": "shape test"},
                headers={"X-Username": shape_user})
     post_body = r.json()
-    check_keys("POST /posts response has exactly {id, username, message, created_at}",
+    check_keys("POST /posts response has exactly {id, username, message, created_at, updated_at}",
                r.status_code, post_body, expected_post_keys)
 
-    # GET /posts/{id}: response should have exactly {id, username, message, created_at}
+    # GET /posts/{id}: response should have exactly {id, username, message, created_at, updated_at}
     post_id = post_body["id"]
     r = c.get(f"/posts/{post_id}")
-    check_keys("GET /posts/{{id}} response has exactly {id, username, message, created_at}",
+    check_keys("GET /posts/{{id}} response has exactly {id, username, message, created_at, updated_at}",
                r.status_code, r.json(), expected_post_keys)
 
-    # GET /posts: each item should have exactly {id, username, message, created_at}
+    # GET /posts: each item should have exactly {id, username, message, created_at, updated_at}
     r = c.get("/posts")
     posts = r.json()
     bad_keys = [set(p.keys()) for p in posts if set(p.keys()) != expected_post_keys]
     check(
-        "GET /posts items have exactly {id, username, message, created_at}",
+        "GET /posts items have exactly {id, username, message, created_at, updated_at}",
         r.status_code == 200 and len(posts) > 0 and len(bad_keys) == 0,
         detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
     )
 
-    # GET /users/{username}/posts: each item should have exactly {id, username, message, created_at}
+    # GET /users/{username}/posts: each item should have exactly {id, username, message, created_at, updated_at}
     # 
     # @AIANDY, the spec's field shape requirements only mention POST/GET /posts
     # and POST/GET /users, but /users/{username}/posts also returns post objects.
@@ -394,7 +395,7 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
     user_posts = r.json()
     bad_keys = [set(p.keys()) for p in user_posts if set(p.keys()) != expected_post_keys]
     check(
-        "GET /users/{username}/posts items have exactly {id, username, message, created_at}",
+        "GET /users/{username}/posts items have exactly {id, username, message, created_at, updated_at}",
         r.status_code == 200 and len(user_posts) > 0 and len(bad_keys) == 0,
         detail=f"status {r.status_code}, bad items keys={bad_keys[:3]}",
     )
@@ -439,6 +440,174 @@ def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
     r = c.post("/users", json={"username": "ab"})
     check_keys("422 error body has exactly {detail} (POST /users too short)",
                r.status_code, r.json(), expected_error_keys)
+
+
+def run_silver_checks(c: httpx.Client, state: dict) -> None:
+    # Create a fresh user for silver tests
+    silver_user = f"silver_{RUN}"
+    c.post("/users", json={"username": silver_user})
+
+    # --- PATCH /users/{username}: update bio ---
+
+    # PATCH with valid bio returns 200 and updated user object
+    r = c.patch(f"/users/{silver_user}", json={"bio": "test bio"})
+    check(
+        "PATCH /users/{username} with valid bio returns 200",
+        r.status_code == 200,
+        detail=f"got {r.status_code}",
+    )
+
+    # Bio value is present in the PATCH response
+    body = r.json()
+    check(
+        "PATCH /users/{username} response contains updated bio",
+        body.get("bio") == "test bio",
+        detail=f"got bio={body.get('bio')}",
+    )
+
+    # Bio persists - GET after PATCH shows the new bio
+    r = c.get(f"/users/{silver_user}")
+    check(
+        "GET /users/{username} after PATCH shows updated bio",
+        r.json().get("bio") == "test bio",
+        detail=f"got bio={r.json().get('bio')}",
+    )
+
+    # PATCH nonexistent user returns 404
+    r = c.patch(f"/users/{GHOST}", json={"bio": "nope"})
+    check(
+        "PATCH /users/{username} nonexistent user returns 404",
+        r.status_code == 404,
+        detail=f"got {r.status_code}",
+    )
+
+    # PATCH with bio over 200 chars returns 422
+    r = c.patch(f"/users/{silver_user}", json={"bio": "a" * 201})
+    check(
+        "PATCH /users/{username} bio over 200 chars returns 422",
+        r.status_code == 422,
+        detail=f"got {r.status_code}",
+    )
+
+    # --- bio and post_count value checks ---
+
+    # New user starts with bio=null and post_count=0
+    fresh_user = f"freshuser_{RUN}"
+    r = c.post("/users", json={"username": fresh_user})
+    body = r.json()
+    check(
+        "New user has bio=null",
+        body.get("bio") is None,
+        detail=f"got bio={body.get('bio')}",
+    )
+    check(
+        "New user has post_count=0",
+        body.get("post_count") == 0,
+        detail=f"got post_count={body.get('post_count')}",
+    )
+
+    # After creating posts, post_count reflects the count
+    c.post("/posts", json={"message": "post 1"}, headers={"X-Username": fresh_user})
+    c.post("/posts", json={"message": "post 2"}, headers={"X-Username": fresh_user})
+    r = c.get(f"/users/{fresh_user}")
+    check(
+        "post_count reflects number of posts",
+        r.json().get("post_count") == 2,
+        detail=f"got post_count={r.json().get('post_count')}",
+    )
+
+    # --- PATCH /posts/{id}: edit message ---
+
+    # Create a post to edit
+    r = c.post("/posts", json={"message": "original"}, headers={"X-Username": silver_user})
+    edit_post_id = r.json()["id"]
+
+    # PATCH with valid message returns 200
+    r = c.patch(f"/posts/{edit_post_id}", json={"message": "edited"})
+    check(
+        "PATCH /posts/{id} with valid message returns 200",
+        r.status_code == 200,
+        detail=f"got {r.status_code}",
+    )
+
+    # Response contains the updated message
+    body = r.json()
+    check(
+        "PATCH /posts/{id} response contains updated message",
+        body.get("message") == "edited",
+        detail=f"got message={body.get('message')}",
+    )
+
+    # Response has updated_at set (not null after edit)
+    check(
+        "PATCH /posts/{id} response has updated_at set",
+        body.get("updated_at") is not None,
+        detail=f"got updated_at={body.get('updated_at')}",
+    )
+
+    # Edit persists - GET after PATCH shows new message
+    r = c.get(f"/posts/{edit_post_id}")
+    check(
+        "GET /posts/{id} after PATCH shows updated message",
+        r.json().get("message") == "edited",
+        detail=f"got message={r.json().get('message')}",
+    )
+
+    # PATCH nonexistent post returns 404
+    r = c.patch("/posts/99999999", json={"message": "nope"})
+    check(
+        "PATCH /posts/{id} nonexistent post returns 404",
+        r.status_code == 404,
+        detail=f"got {r.status_code}",
+    )
+
+    # PATCH with empty message returns 422
+    r = c.patch(f"/posts/{edit_post_id}", json={"message": ""})
+    check(
+        "PATCH /posts/{id} empty message returns 422",
+        r.status_code == 422,
+        detail=f"got {r.status_code}",
+    )
+
+    # PATCH with oversized message returns 422
+    r = c.patch(f"/posts/{edit_post_id}", json={"message": "a" * 501})
+    check(
+        "PATCH /posts/{id} oversized message returns 422",
+        r.status_code == 422,
+        detail=f"got {r.status_code}",
+    )
+
+    # --- GET /posts?username= filter ---
+
+    # Returns only that user's posts
+    r = c.get("/posts", params={"username": silver_user})
+    posts = r.json()
+    check(
+        "GET /posts?username= returns only that user's posts",
+        r.status_code == 200
+        and len(posts) > 0
+        and all(p["username"] == silver_user for p in posts),
+        detail=f"status {r.status_code}, count={len(posts)}",
+    )
+
+    # Returns empty array for nonexistent user (not 404)
+    r = c.get("/posts", params={"username": GHOST})
+    check(
+        "GET /posts?username= with nonexistent user returns empty array",
+        r.status_code == 200 and r.json() == [],
+        detail=f"status {r.status_code}, body={r.json()}",
+    )
+
+    # Composable with ?q= - filters by both username and search term
+    r = c.get("/posts", params={"username": silver_user, "q": "edited"})
+    posts = r.json()
+    check(
+        "GET /posts?username=&q= composes both filters",
+        r.status_code == 200
+        and len(posts) >= 1
+        and all(p["username"] == silver_user and "edited" in p["message"] for p in posts),
+        detail=f"status {r.status_code}, count={len(posts)}",
+    )
 
 
 if __name__ == "__main__":

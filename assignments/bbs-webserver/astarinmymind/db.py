@@ -30,7 +30,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                bio TEXT
             )
         """))
         conn.execute(text("""
@@ -39,6 +40,7 @@ def init_db():
                 user_id INTEGER NOT NULL,
                 message TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                updated_at TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """))
@@ -66,27 +68,66 @@ def create_user(conn, username: str) -> dict | None:
     )
     conn.commit()
     # Return the user dict matching the API response shape
-    return {"username": username, "created_at": created_at}
+    return {"username": username, "created_at": created_at, "bio": None, "post_count": 0}
 
 
 def list_users(conn) -> list[dict]:
     """Return all users as a list of dicts matching the API response shape."""
     rows = conn.execute(
-        text("SELECT username, created_at FROM users ORDER BY id"),
+        text("""
+            SELECT u.username, u.created_at, u.bio,
+                   (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS post_count
+            FROM users u
+            ORDER BY u.id
+        """),
     ).mappings().all()
-    return [{"username": row["username"], "created_at": row["created_at"]} for row in rows]
+    return [
+        {
+            "username": row["username"],
+            "created_at": row["created_at"],
+            "bio": row["bio"],
+            "post_count": row["post_count"],
+        }
+        for row in rows
+    ]
 
 
 def get_user_by_username(conn, username: str) -> dict | None:
     """Look up one user by username. Returns dict or None if not found."""
     row = conn.execute(
-        text("SELECT username, created_at FROM users WHERE username = :username"),
+        text("""
+            SELECT u.username, u.created_at, u.bio,
+                   (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS post_count
+            FROM users u
+            WHERE u.username = :username
+        """),
         {"username": username},
     ).mappings().fetchone()
     # No match found - API layer will return 404
     if row is None:
         return None
-    return {"username": row["username"], "created_at": row["created_at"]}
+    return {
+        "username": row["username"],
+        "created_at": row["created_at"],
+        "bio": row["bio"],
+        "post_count": row["post_count"],
+    }
+
+
+def update_user_bio(conn, username: str, bio: str) -> dict | None:
+    """Update a user's bio. Returns updated user dict, or None if not found."""
+    # Check user exists first
+    user = get_user_by_username(conn, username)
+    if user is None:
+        return None
+    conn.execute(
+        text("UPDATE users SET bio = :bio WHERE username = :username"),
+        {"bio": bio, "username": username},
+    )
+    conn.commit()
+    # Return the updated user dict with new bio
+    user["bio"] = bio
+    return user
 
 
 def create_post(conn, username: str, message: str) -> dict | None:
@@ -115,6 +156,7 @@ def create_post(conn, username: str, message: str) -> dict | None:
         "username": username,
         "message": message,
         "created_at": created_at,
+        "updated_at": None,
     }
 
 
@@ -158,7 +200,7 @@ def list_posts(
     # JOIN users to surface the username in each post (API response shape
     # needs username, but the posts table only stores user_id).
     sql = f"""
-        SELECT p.id, u.username, p.message, p.created_at
+        SELECT p.id, u.username, p.message, p.created_at, p.updated_at
         FROM posts p
         JOIN users u ON p.user_id = u.id
         {where}
@@ -173,6 +215,7 @@ def list_posts(
             "username": row["username"],
             "message": row["message"],
             "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
         }
         for row in rows
     ]
@@ -184,7 +227,7 @@ def get_post_by_id(conn, post_id: int) -> dict | None:
     # on users, not posts.
     row = conn.execute(
         text("""
-            SELECT p.id, u.username, p.message, p.created_at
+            SELECT p.id, u.username, p.message, p.created_at, p.updated_at
             FROM posts p
             JOIN users u ON p.user_id = u.id
             WHERE p.id = :id
@@ -199,7 +242,24 @@ def get_post_by_id(conn, post_id: int) -> dict | None:
         "username": row["username"],
         "message": row["message"],
         "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
     }
+
+
+def update_post_message(conn, post_id: int, message: str) -> dict | None:
+    """Update a post's message. Returns updated post dict, or None if not found."""
+    post = get_post_by_id(conn, post_id)
+    if post is None:
+        return None
+    updated_at = datetime.now().isoformat(timespec="seconds")
+    conn.execute(
+        text("UPDATE posts SET message = :message, updated_at = :updated_at WHERE id = :id"),
+        {"message": message, "updated_at": updated_at, "id": post_id},
+    )
+    conn.commit()
+    post["message"] = message
+    post["updated_at"] = updated_at
+    return post
 
 
 def delete_post(conn, post_id: int) -> bool:
