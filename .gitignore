@@ -1,5 +1,0 @@
-.DS_Store
-.venv/
-bbs.db
-__pycache__/
-*.pyc
