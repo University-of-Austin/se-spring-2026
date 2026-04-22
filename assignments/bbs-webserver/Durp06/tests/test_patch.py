@@ -40,6 +40,40 @@ class TestSilverUserShape:
         r = client.patch("/users/alice", json={"bio": "x" * 201})
         assert r.status_code == 422
 
+    def test_patch_users_empty_body_200_noop(self, client):
+        """PATCH with {} is a no-op: returns 200 with unchanged user."""
+        client.post("/users", json={"username": "alice", "bio": "original bio"})
+        r = client.patch("/users/alice", json={})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["bio"] == "original bio"
+        assert body["username"] == "alice"
+
+    def test_patch_users_bio_null_200_noop(self, client):
+        """PATCH with bio=null is a no-op: bio stays unchanged."""
+        client.post("/users", json={"username": "alice", "bio": "original bio"})
+        r = client.patch("/users/alice", json={"bio": None})
+        assert r.status_code == 200
+        assert r.json()["bio"] == "original bio"
+
+    def test_patch_users_bio_string_200_updates(self, client):
+        """Regression: PATCH with bio string still updates correctly."""
+        client.post("/users", json={"username": "alice", "bio": "old"})
+        r = client.patch("/users/alice", json={"bio": "new"})
+        assert r.status_code == 200
+        assert r.json()["bio"] == "new"
+
+    def test_patch_users_ghost_empty_body_404(self, client):
+        """Missing user takes precedence over no-op: still 404."""
+        r = client.patch("/users/ghost", json={})
+        assert r.status_code == 404
+
+    def test_patch_users_bio_too_long_regression_422(self, client):
+        """Regression: oversized bio still 422 even after no-op fix."""
+        client.post("/users", json={"username": "alice"})
+        r = client.patch("/users/alice", json={"bio": "x" * 201})
+        assert r.status_code == 422
+
 
 class TestSilverPostUpdatedAt:
     def test_post_posts_includes_updated_at(self, client):

@@ -60,7 +60,7 @@ class PostOut(BaseModel):
 
 
 class UserPatch(BaseModel):
-    bio: str = Field(..., max_length=200)
+    bio: str | None = Field(default=None, max_length=200)
 
 
 class PostPatch(BaseModel):
@@ -129,7 +129,11 @@ def get_user(username: str, engine=Depends(get_engine_dep)):
 @app.patch("/users/{username}", response_model=UserOut)
 def patch_user(username: str, body: UserPatch, engine=Depends(get_engine_dep)):
     with engine.begin() as conn:
-        user = q.update_user_bio(conn, username, body.bio)
+        if body.bio is None:
+            # No-op: return current user state without writing to DB
+            user = q.get_user(conn, username)
+        else:
+            user = q.update_user_bio(conn, username, body.bio)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
