@@ -133,6 +133,12 @@ def list_posts(
     """
     # Build WHERE clauses dynamically based on which filters are active.
     # The SELECT/JOIN/ORDER/LIMIT stay the same in every case.
+    #
+    # SQL injection note: the {where} f-string below only splices hardcoded
+    # clause strings into the query. User input (q, username) is never
+    # interpolated into SQL - it only reaches the database as bound params
+    # via the params dict. The f"%{q}%" below builds a Python LIKE pattern,
+    # which is a value, not SQL.
     clauses: list[str] = []
     params: dict = {"limit": limit, "offset": offset}
 
