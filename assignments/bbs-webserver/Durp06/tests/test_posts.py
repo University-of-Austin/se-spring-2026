@@ -78,3 +78,13 @@ def test_delete_post_then_get_404(client):
 def test_delete_nonexistent_post_404(client):
     r = client.delete("/posts/99999999")
     assert r.status_code == 404
+
+
+# Silver: updated_at on post create
+def test_post_posts_updated_at_equals_created_at(client):
+    client.post("/users", json={"username": "alice"})
+    r = client.post("/posts", json={"message": "hello"}, headers={"X-Username": "alice"})
+    assert r.status_code == 201
+    body = r.json()
+    assert "updated_at" in body
+    assert body["updated_at"] == body["created_at"]
