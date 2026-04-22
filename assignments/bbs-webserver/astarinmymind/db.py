@@ -164,6 +164,7 @@ def list_posts(
     conn,
     q: str | None = None,
     username: str | None = None,
+    since: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
@@ -172,6 +173,7 @@ def list_posts(
     Filters:
       q: case-insensitive substring match on message text
       username: exact match on the post's author
+      since: ISO timestamp - only return posts created after this time
     """
     # Build WHERE clauses dynamically based on which filters are active.
     # The SELECT/JOIN/ORDER/LIMIT stay the same in every case.
@@ -185,15 +187,22 @@ def list_posts(
     params: dict = {"limit": limit, "offset": offset}
 
     if q is not None:
-        # Substring search on message, case-insensitive via SQLite's NOCASE collation
-        clauses.append("p.message LIKE :q COLLATE NOCASE")
-        params["q"] = f"%{q}%"
+        # Substring search on message, case-insensitive via SQLite's NOCASE collation.
+        # Escape % and _ so they're treated as literal characters, not LIKE wildcards.
+        escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        clauses.append("p.message LIKE :q ESCAPE '\\' COLLATE NOCASE")
+        params["q"] = f"%{escaped}%"
 
     if username is not None:
         # Filter by the post's author. Uses u.username (the joined users table)
         # so we do not need a separate user_id lookup.
         clauses.append("u.username = :username")
         params["username"] = username
+
+    if since is not None:
+        # Only return posts created at or after this ISO timestamp
+        clauses.append("p.created_at >= :since")
+        params["since"] = since
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 

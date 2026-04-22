@@ -118,6 +118,7 @@ def main() -> int:
     # ==================================================================
     run_field_shape_checks(c, state)
     run_silver_checks(c, state)
+    run_gold_checks(c, state)
 
     print()
     print(f"{PASSED} passed, {FAILED} failed")
@@ -277,6 +278,16 @@ def run_search_checks(c: httpx.Client, state: dict) -> None:
         "GET /posts?q= with no matches returns 200 + empty array",
         r.status_code == 200 and r.json() == [],
         detail=f"status {r.status_code}, body={r.json()}",
+    )
+
+    # Search for a literal % should not match everything - % is a LIKE wildcard
+    # that needs to be escaped. Without escaping, ?q=% builds LIKE '%%%' which
+    # matches every post in the database.
+    r = c.get("/posts", params={"q": "%"})
+    check(
+        "GET /posts?q=% does not match all posts (LIKE wildcard escaped)",
+        r.status_code == 200 and r.json() == [],
+        detail=f"status {r.status_code}, count={len(r.json())}",
     )
 
 
@@ -676,6 +687,73 @@ def run_silver_checks(c: httpx.Client, state: dict) -> None:
         and len(posts) <= 1
         and all(p["username"] == silver_user for p in posts),
         detail=f"status {r.status_code}, count={len(posts)}",
+    )
+
+
+def run_gold_checks(c: httpx.Client, state: dict) -> None:
+    # --- GET /feed: N most recent posts across all users ---
+
+    # Basic /feed returns 200 and a JSON array
+    r = c.get("/feed")
+    check(
+        "GET /feed returns 200",
+        r.status_code == 200,
+        detail=f"got {r.status_code}",
+    )
+    feed = r.json()
+    check(
+        "GET /feed returns a JSON array",
+        isinstance(feed, list),
+        detail=f"got {type(feed).__name__}",
+    )
+
+    # /feed posts have the same field shape as /posts
+    expected_post_keys = {"id", "username", "message", "created_at", "updated_at"}
+    if len(feed) > 0:
+        bad_keys = [set(p.keys()) for p in feed if set(p.keys()) != expected_post_keys]
+        check(
+            "GET /feed items have exactly {id, username, message, created_at, updated_at}",
+            len(bad_keys) == 0,
+            detail=f"bad items keys={bad_keys[:3]}",
+        )
+
+    # /feed?limit=N returns at most N items
+    r = c.get("/feed", params={"limit": 2})
+    check(
+        "GET /feed?limit=2 returns at most 2 items",
+        r.status_code == 200 and len(r.json()) <= 2,
+        detail=f"status {r.status_code}, count={len(r.json())}",
+    )
+
+    # /feed?since= filters to only newer posts
+    # Record a timestamp, create a post after it, then check /feed?since= only returns the new one
+    from datetime import datetime
+    since_ts = datetime.now().isoformat(timespec="seconds")
+
+    gold_user = f"golduser_{RUN}"
+    c.post("/users", json={"username": gold_user})
+    r = c.post("/posts", json={"message": f"gold_needle_{RUN}"}, headers={"X-Username": gold_user})
+    new_post_id = r.json()["id"]
+
+    r = c.get("/feed", params={"since": since_ts})
+    feed_since = r.json()
+    check(
+        "GET /feed?since= returns 200",
+        r.status_code == 200,
+        detail=f"got {r.status_code}",
+    )
+    # The post we just created should be in the filtered feed
+    feed_ids = [p["id"] for p in feed_since]
+    check(
+        "GET /feed?since= includes post created after timestamp",
+        new_post_id in feed_ids,
+        detail=f"looking for {new_post_id} in {feed_ids}",
+    )
+    # Posts older than since should not appear - check none predate the cutoff
+    check(
+        "GET /feed?since= excludes posts created before timestamp",
+        all(p["created_at"] >= since_ts for p in feed_since),
+        detail=f"timestamps: {[p['created_at'] for p in feed_since[:5]]}",
     )
 
 

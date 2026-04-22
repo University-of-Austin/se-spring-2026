@@ -106,6 +106,17 @@ def list_posts(
         return db.list_posts(conn, q=q, username=username, limit=limit, offset=offset)
 
 
+@app.get("/feed")
+def feed(
+    limit: int = Query(default=50, ge=1, le=200),
+    since: str | None = Query(default=None),
+) -> list[dict]:
+    """Return the N most recent posts across all users.
+    Optional ?since=<timestamp> returns only posts newer than that time."""
+    with db.engine.connect() as conn:
+        return db.list_posts(conn, since=since, limit=limit)
+
+
 @app.get("/posts/{post_id}")
 def get_post_by_id(post_id: int) -> dict:
     with db.engine.connect() as conn:
