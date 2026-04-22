@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+bbs.db
+bbs.json
+backups/
+exports/
+uploads/
