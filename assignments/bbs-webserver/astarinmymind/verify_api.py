@@ -78,7 +78,7 @@ def main() -> int:
     #
     # When you've implemented it, uncomment the call below.
     # ==================================================================
-    # run_delete_checks(c, state)
+    run_delete_checks(c, state)
 
     # ==================================================================
     # STUDENT TODO #2: pagination on GET /posts
@@ -92,7 +92,7 @@ def main() -> int:
     #
     # When you've implemented it, uncomment the call below.
     # ==================================================================
-    # run_pagination_checks(c, state)
+    run_pagination_checks(c, state)
 
     # ==================================================================
     # STUDENT TODO #3: exact response field shapes
@@ -259,15 +259,73 @@ def run_search_checks(c: httpx.Client, state: dict) -> None:
 
 
 def run_delete_checks(c: httpx.Client, state: dict) -> None:
-    # STUDENT TODO #1: implement this function. See the comment above for
-    # the list of behaviors to verify. Use the `check()` helper.
-    raise NotImplementedError("student must implement run_delete_checks")
+    # Create a fresh post just for this section so we can delete it without
+    # disturbing posts other checks (e.g. run_field_shape_checks) rely on.
+    r = c.post("/posts", json={"message": "to be deleted"}, headers={"X-Username": ALICE})
+    doomed_id = r.json()["id"]
+
+    # DELETE on an existing post returns 204
+    r = c.delete(f"/posts/{doomed_id}")
+    check(
+        f"DELETE /posts/{doomed_id} returns 204",
+        r.status_code == 204,
+        detail=f"got {r.status_code}",
+    )
+
+    # After DELETE, GET on the same id returns 404
+    r = c.get(f"/posts/{doomed_id}")
+    check(
+        f"GET /posts/{doomed_id} after delete returns 404",
+        r.status_code == 404,
+        detail=f"got {r.status_code}",
+    )
+
+    # DELETE on a post id that does not exist returns 404
+    r = c.delete("/posts/99999999")
+    check(
+        "DELETE /posts/99999999 (nonexistent) returns 404",
+        r.status_code == 404,
+        detail=f"got {r.status_code}",
+    )
 
 
 def run_pagination_checks(c: httpx.Client, state: dict) -> None:
-    # STUDENT TODO #2: implement this function. See the comment above for
-    # the list of behaviors to verify. Use the `check()` helper.
-    raise NotImplementedError("student must implement run_pagination_checks")
+    # GET /posts?limit=N returns at most N items
+    r = c.get("/posts", params={"limit": 2})
+    items = r.json() if r.status_code == 200 else []
+    check(
+        "GET /posts?limit=2 returns at most 2 items",
+        r.status_code == 200 and len(items) <= 2,
+        detail=f"status {r.status_code}, got {len(items)} items",
+    )
+
+    # GET /posts?offset=K skips the first K items
+    r_base = c.get("/posts", params={"limit": 10})
+    baseline = r_base.json() if r_base.status_code == 200 else []
+    r_off = c.get("/posts", params={"offset": 1, "limit": 10})
+    offset_list = r_off.json() if r_off.status_code == 200 else []
+    check(
+        "GET /posts?offset=1 skips the first item",
+        r_base.status_code == 200
+        and r_off.status_code == 200
+        and len(baseline) >= 2
+        and len(offset_list) >= 1
+        and offset_list[0]["id"] == baseline[1]["id"],
+        detail=f"baseline_status={r_base.status_code}, offset_status={r_off.status_code}, "
+               f"baseline_len={len(baseline)}, offset_len={len(offset_list)}",
+    )
+
+    # GET /posts?limit=0 returns 422
+    r = c.get("/posts", params={"limit": 0})
+    check("GET /posts?limit=0 returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+
+    # GET /posts?limit=500 returns 422
+    r = c.get("/posts", params={"limit": 500})
+    check("GET /posts?limit=500 returns 422", r.status_code == 422, detail=f"got {r.status_code}")
+
+    # GET /posts?offset=-1 returns 422
+    r = c.get("/posts", params={"offset": -1})
+    check("GET /posts?offset=-1 returns 422", r.status_code == 422, detail=f"got {r.status_code}")
 
 
 def run_field_shape_checks(c: httpx.Client, state: dict) -> None:
