@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}BBS — Admin Panel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> ADMIN PANEL
+</div>
+
+<div class="admin-stats">
+  <div class="card stat-card">
+    <div class="stat-number">{{ stats.users }}</div>
+    <div class="stat-label">Users</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-number">{{ stats.posts }}</div>
+    <div class="stat-label">Posts</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-number">{{ stats.boards }}</div>
+    <div class="stat-label">Boards</div>
+  </div>
+</div>
+
+<div class="page-header" style="font-size:1rem">
+  Users
+</div>
+
+<div class="card" style="overflow-x:auto">
+  <table class="user-table">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Posts</th>
+        <th>Role</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in all_users %}
+      <tr>
+        <td><a href="/profile/{{ u.username }}" class="post-username">{{ u.username }}</a></td>
+        <td>{{ u.post_count }}</td>
+        <td>
+          <form action="/admin/role/{{ u.username }}" method="post" style="display:inline">
+            <select name="role" class="form-select" style="width:auto;padding:2px 6px;font-size:0.7rem" onchange="this.form.submit()">
+              <option value="user" {% if u.role is not defined or u.role == 'user' %}selected{% endif %}>user</option>
+              <option value="mod" {% if u.role is defined and u.role == 'mod' %}selected{% endif %}>mod</option>
+              <option value="admin" {% if u.role is defined and u.role == 'admin' %}selected{% endif %}>admin</option>
+            </select>
+          </form>
+        </td>
+        <td>
+          <form action="/admin/ban/{{ u.username }}" method="post" style="display:inline">
+            <input type="hidden" name="reason" value="Admin action">
+            <button type="submit" class="action-btn" style="font-size:0.65rem">ban</button>
+          </form>
+          <form action="/admin/unban/{{ u.username }}" method="post" style="display:inline">
+            <button type="submit" class="action-btn" style="font-size:0.65rem">unban</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="page-header mt-2" style="font-size:1rem">
+  Moderation Log
+</div>
+
+{% for entry in mod_log %}
+<div class="card" style="padding:0.6rem 1rem">
+  <div class="flex gap-1 items-center">
+    <span class="post-meta">{{ entry.timestamp|timeago }}</span>
+    <span class="post-username" style="font-size:0.75rem">{{ entry.mod }}</span>
+    <span class="text-dim mono" style="font-size:0.75rem">{{ entry.action }}</span>
+    <span class="mono" style="font-size:0.75rem">&#8594; {{ entry.target }}</span>
+    {% if entry.reason %}
+    <span class="text-dim mono" style="font-size:0.7rem">({{ entry.reason }})</span>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% if not mod_log %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">No moderation actions yet.</span>
+</div>
+{% endif %}
+{% endblock %}
