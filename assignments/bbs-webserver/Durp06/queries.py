@@ -1,5 +1,5 @@
 """All SQL lives here. Route handlers never write SQL."""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 
 
@@ -8,7 +8,7 @@ class UserNotFound(Exception):
 
 
 def _now() -> str:
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _user_row_to_out(conn, row) -> dict:
