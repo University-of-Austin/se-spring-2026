@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip install -r requirements.txt)",
+      "PowerShell(python --version)",
+      "PowerShell(py --version)",
+      "PowerShell($paths = @\\(\"C:\\\\Python312\\\\python.exe\",\"C:\\\\Python311\\\\python.exe\",\"C:\\\\Python310\\\\python.exe\",\"C:\\\\Python39\\\\python.exe\",\"C:\\\\Python313\\\\python.exe\",\"C:\\\\Python\\\\python.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Python\\\\Python312\\\\python.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Python\\\\Python311\\\\python.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Python\\\\Python310\\\\python.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Python\\\\Python313\\\\python.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\Python\\\\Python39\\\\python.exe\"\\); foreach\\($p in $paths\\){ if\\(Test-Path $p\\){ Write-Output \"FOUND: $p\" } })",
+      "PowerShell($py = Get-Command python -All -ErrorAction SilentlyContinue; $py | Select-Object Name,Source; Write-Output \"---\"; $env:PATH -split ';' | Where-Object { $_ -match 'python|conda|Anaconda' })",
+      "PowerShell(python -m pip install -r requirements.txt 2>&1)",
+      "PowerShell(python verify_api.py)",
+      "PowerShell(python verify_api.py 2>&1)",
+      "PowerShell($r = Invoke-WebRequest -Uri \"http://localhost:8000/openapi.json\" -UseBasicParsing; Write-Output \"openapi status: $\\($r.StatusCode\\)\"; $json = $r.Content | ConvertFrom-Json; Write-Output \"paths:\"; $json.paths.PSObject.Properties.Name | ForEach-Object { Write-Output \"  $_\" })",
+      "PowerShell(python -c \"import httpx; c = httpx.Client\\(base_url='http://localhost:8000'\\); r = c.patch\\('/posts/99999999', json={'message':'x'}\\); print\\('PATCH no hdr:', r.status_code, r.json\\(\\)\\); r = c.post\\('/users', json={'username':'extrafld','email':'x'}\\); print\\('extra=forbid:', r.status_code\\); r = c.get\\('/users/zzzzzzz'\\); print\\('404 shape:', r.status_code, r.json\\(\\)\\); r = c.get\\('/'\\); print\\('GET /:', r.status_code\\)\")",
+      "PowerShell(Get-Command pip -ErrorAction SilentlyContinue)",
+      "PowerShell(pip --version 2>&1)"
+    ]
+  }
+}
