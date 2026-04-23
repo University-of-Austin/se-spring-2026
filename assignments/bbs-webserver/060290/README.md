@@ -3,8 +3,7 @@
 ```pip3 install -r requirements.txt```
 
 2. Start the server: 
-python3 -m uvicorn 
-main:app --port 8000
+```python3 -m uvicorn main:app --port 8000```
 The database is created automatically on the first run.
 
 ## Tier Targeted
@@ -16,8 +15,7 @@ Chose /posts over /messages because the bulletin board system uses the word 'pos
 Chose hard delete for DELETE /posts/{id} because it was under the table of REST commands, and for a simple BBS there's no need to recover deleted posts.
 Kept raw SQL with text() from A1 because it makes the database queries transparent and easy to debug. The ORM would hide the SQL, making it harder to verify correct behavior.
 
-##Schema Changes 
-
+## Schema Changes 
 
 **Users table:** Added `created_at TEXT NOT NULL` to track when a user was created, since the API response requires it. Removed `bio TEXT` because it was not needed for bronze tier.
 
