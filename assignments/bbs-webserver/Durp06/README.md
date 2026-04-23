@@ -58,3 +58,19 @@ CREATE TABLE posts (
 `X-Username` is a client-asserted identity header. The client tells us who it claims to be; we trust the string. There is no cryptography, no login, no session, no proof. Anyone who can send an HTTP request can impersonate any user by changing the header value. This is deliberately chosen for this assignment to teach header-based identity plumbing, but it is not authentication.
 
 Real authentication would require, at minimum: (1) a trusted credential issuer (a login endpoint that verifies a password or OAuth token and mints a session token or signed JWT), (2) server-side verification of that token on every protected request, (3) TLS on every hop so the token isn't sniffed, (4) CSRF protection if browsers are clients (SameSite cookies or double-submit tokens), (5) replay/expiry handling (short-lived tokens + refresh, or nonces), and (6) some form of session revocation (server-side store for session tokens, or a short JWT TTL).
+
+## 7. Silver and gold features — what was added and why
+
+### Silver
+
+- **User shape extension — `bio` + `post_count` on every user response** (`main.py:43-48` model, `queries.py:14-27` serializer). Chosen because the A2 spec asks for richer user detail without an extra endpoint; computing `post_count` server-side via `COUNT(*) FROM posts WHERE user_id = ?` keeps the client honest (it cannot drift from the real count).
+- **`PATCH /users/{username}`** (`main.py:129-139`, `queries.py:68-83`). Only `bio` is mutable; `username` and `created_at` are treated as immutable identity. Empty body `{}` is a no-op that returns 200 with the unchanged user, per PATCH semantics (see commit e5fd5a4 — we explicitly wire this path rather than 422-ing).
+- **`PATCH /posts/{id}` with `X-Username` ownership enforcement** (`main.py:206-220`, `queries.py:178-198`). Three-code ownership policy — 400 missing header, 404 post not found, 403 author mismatch — chosen because each has a different meaning in the HTTP spec and collapsing them loses diagnostic signal.
+- **`GET /posts?username=alice` author filter** (`main.py:172`, `queries.py:138-167`). Composable with `?q=`, `?limit=`, `?offset=`, and (gold) `?cursor=`. Unknown username returns `200 []` rather than 404 — "filter with no matches" is not the same as "endpoint not found."
+
+### Gold
+
+- **Cursor pagination on `GET /posts`** (`main.py:79-87` encode/decode helpers, `main.py:169-186` dispatch, `queries.py:138-167` query). Additive envelope: `?cursor=` present returns `{"posts":[...], "next_cursor": ...}`; absent keeps the bronze bare-array contract (so `?limit=` and `?offset=` still pass bronze checks).
+- **Why cursor over offset:** if a row is inserted between page 1 and page 2 of an `OFFSET`-based query, offset re-counts from the top — either skipping a row (insert before current offset) or duplicating one (insert after). A cursor pinned to `last_seen_id` continues from that anchor regardless of concurrent inserts.
+- **Cursor opacity:** the cursor is `base64.urlsafe_b64encode(json.dumps({"id": last_id}))`. Base64 is URL-safe and opaque to clients (discourages them from parsing or incrementing); the JSON payload inside lets us add cursor fields later (e.g. `{"id": ..., "ts": ...}`) without breaking older clients.
+- **Cursor validation:** `decode_cursor` returns 422 on any parse failure — bad base64, bad JSON, missing `id` key, non-int, or negative int. README treats the cursor as a black-box string; never expose the encoding scheme in the API contract.

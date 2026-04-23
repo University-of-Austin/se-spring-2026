@@ -82,9 +82,12 @@ def encode_cursor(last_id: int) -> str:
 
 def decode_cursor(raw: str) -> int:
     try:
-        return int(json.loads(base64.urlsafe_b64decode(raw.encode()).decode())["id"])
+        decoded = int(json.loads(base64.urlsafe_b64decode(raw.encode()).decode())["id"])
     except Exception:
         raise HTTPException(status_code=422, detail="invalid cursor")
+    if decoded < 0:
+        raise HTTPException(status_code=422, detail="invalid cursor")
+    return decoded
 
 
 # ---------------------------------------------------------------------------

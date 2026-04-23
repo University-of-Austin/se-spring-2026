@@ -89,3 +89,15 @@ def test_cursor_valid_b64_invalid_json_422(client):
     bad = base64.urlsafe_b64encode(b"not-json").decode()
     r = client.get("/posts", params={"cursor": bad})
     assert r.status_code == 422
+
+
+def test_cursor_negative_id_422(client):
+    _seed_posts(client, "alice", 3)
+    r = client.get("/posts", params={"cursor": encode_cursor(-1)})
+    assert r.status_code == 422
+
+
+def test_cursor_missing_id_key_422(client):
+    bad = base64.urlsafe_b64encode(json.dumps({"notid": 1}).encode()).decode()
+    r = client.get("/posts", params={"cursor": bad})
+    assert r.status_code == 422
