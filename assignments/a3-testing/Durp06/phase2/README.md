@@ -26,12 +26,14 @@ resolve without rework.
 
 ## Surprises
 
-The spec re-read surfaced three corners the catalog wording skipped. For
-the interval merger, fixing A9 (mutating `intervals.sort()`) also fixed A11
-as a side effect, since removing the in-place sort forced rebuilding a fresh
-sorted copy that rendered the input-position reorder block dead code. For
-the LRU cache, the eviction loop correctly uses the physical dict `len`,
-not the filtered `__len__`: expired entries occupy physical slots and count
-toward capacity until freed. For the cart, the FREESHIP comparison naturally
-operates on the already-mutated `subtotal` after FLAT5 and clamping, so the
-post-FLAT5 threshold check was correct once the application order was fixed.
+Spec re-read surfaced a hidden cart bug the Phase 1 suite missed: a
+`_bogo_applied_before_bagel` latch set state at `apply_code` time,
+breaking spec C3's "if no bagel line item exists WHEN `total_cents` IS
+COMPUTED" wording. Calling `apply_code("BOGO_BAGEL")` before adding the
+bagel and then `total_cents()` should still apply BOGO; the latch zeroed
+it. Removing the flag and trusting the existing
+`"bagel" in self._items` check at compute time was the fix. LRU
+eviction sticks to physical dict size — expired but unaccessed entries
+still occupy slots until freed. For the merger, removing the in-place
+`intervals.sort()` (A9) dropped the input-position reorder (A11) as
+dead code.

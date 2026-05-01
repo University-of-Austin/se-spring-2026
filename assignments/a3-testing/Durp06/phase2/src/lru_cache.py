@@ -27,7 +27,8 @@ class LRUCache:
         self._data: OrderedDict[Any, _Entry] = OrderedDict()
 
     def put(self, key: Any, value: Any, ttl: float | None = None) -> None:
-        expires_at = None if ttl is None else time.monotonic() + ttl
+        now = time.monotonic()
+        expires_at = None if ttl is None else now + ttl
 
         if key in self._data:
             # A4 fix (C3): replace both value AND expires_at on re-put
@@ -35,6 +36,16 @@ class LRUCache:
             self._data[key].expires_at = expires_at
             self._data.move_to_end(key)
             return
+
+        # H1 fix (C4 + C7): spec C4 references len(cache) which per C7 excludes
+        # expired entries. Reap expired entries first so eviction picks the
+        # genuine LRU among still-valid entries, not a still-valid LRU that
+        # happens to sit in front of an older expired one.
+        for k in [
+            k for k, e in self._data.items()
+            if e.expires_at is not None and e.expires_at <= now
+        ]:
+            del self._data[k]
 
         # A5 fix (C4): evict BEFORE insert so len never exceeds capacity
         while len(self._data) >= self._capacity:

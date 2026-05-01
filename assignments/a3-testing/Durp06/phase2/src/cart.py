@@ -18,7 +18,6 @@ class Cart:
     def __init__(self) -> None:
         self._items: dict[str, tuple[int, int]] = {}
         self._codes: set[str] = set()
-        self._bogo_applied_before_bagel = False
 
     def add_item(self, sku: str, qty: int, unit_price_cents: int) -> None:
         if not isinstance(qty, int) or qty < 1:
@@ -41,9 +40,6 @@ class Cart:
         if code in PERCENT_CODES and any(c in PERCENT_CODES for c in self._codes):
             return False
 
-        if code == "BOGO_BAGEL" and "bagel" not in self._items:
-            self._bogo_applied_before_bagel = True
-
         self._codes.add(code)
         return True
 
@@ -55,15 +51,14 @@ class Cart:
         subtotal = sum(qty * price for qty, price in self._items.values())
 
         # Step 1: BOGO
+        # H3 fix (C3): bagel-presence check is anchored at total_cents() time,
+        # NOT at apply_code() time. If apply_code(BOGO) was called before the
+        # bagel was added but the bagel is in the cart now, BOGO applies.
         if "BOGO_BAGEL" in self._codes and "bagel" in self._items:
-            if self._bogo_applied_before_bagel:
-                bogo_discount = 0
-            else:
-                qty, price = self._items["bagel"]
-                # A17 fix (C3): free units = qty // 2, not (qty - 1) // 2
-                free_units = qty // 2
-                bogo_discount = free_units * price
-            subtotal -= bogo_discount
+            qty, price = self._items["bagel"]
+            # A17 fix (C3): free units = qty // 2, not (qty - 1) // 2
+            free_units = qty // 2
+            subtotal -= free_units * price
 
         # Step 2: percent discount (A14 fix C5: apply percent BEFORE FLAT5)
         percent_rates = [PERCENT_CODES[c] for c in self._codes if c in PERCENT_CODES]
