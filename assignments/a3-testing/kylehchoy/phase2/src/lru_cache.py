@@ -1,25 +1,17 @@
-"""LRU cache with optional per-entry TTL.
-
-Phase 2 fix: implements clauses C1-C7 of the lru_cache spec.
-"""
-from __future__ import annotations
-
+"""LRU cache with optional per-entry TTL."""
 import time
 from collections import OrderedDict
-from typing import Any
+from typing import Any, NamedTuple
 
 
-class _Entry:
-    __slots__ = ("value", "expires_at")
-
-    def __init__(self, value: Any, expires_at: float | None):
-        self.value = value
-        self.expires_at = expires_at
+class _Entry(NamedTuple):
+    value: Any
+    expires_at: float | None
 
 
 class LRUCache:
     def __init__(self, capacity: int) -> None:
-        if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity < 1:
+        if capacity < 1:
             raise ValueError(f"capacity must be a positive int, got {capacity!r}")
         self._capacity = capacity
         self._data: OrderedDict[Any, _Entry] = OrderedDict()
@@ -28,23 +20,18 @@ class LRUCache:
         return entry.expires_at is not None and time.monotonic() >= entry.expires_at
 
     def _purge_expired(self) -> None:
-        for k in [k for k, e in self._data.items() if self._is_expired(e)]:
+        expired = [k for k, e in self._data.items() if self._is_expired(e)]
+        for k in expired:
             del self._data[k]
 
     def put(self, key: Any, value: Any, ttl: float | None = None) -> None:
         expires_at = None if ttl is None else time.monotonic() + ttl
-
         if key in self._data:
-            self._data[key] = _Entry(value, expires_at)
-            self._data.move_to_end(key)
-            return
-
-        # Reclaim expired slots before evicting a live LRU key.
-        self._purge_expired()
-
-        while len(self._data) >= self._capacity:
-            self._data.popitem(last=False)
-
+            del self._data[key]
+        else:
+            self._purge_expired()
+            if len(self._data) >= self._capacity:
+                self._data.popitem(last=False)
         self._data[key] = _Entry(value, expires_at)
 
     def get(self, key: Any) -> Any:
