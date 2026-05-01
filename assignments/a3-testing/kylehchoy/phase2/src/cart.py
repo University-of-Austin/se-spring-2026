@@ -1,9 +1,4 @@
-"""Shopping cart with promo codes.
-
-Phase 2 fix: implements clauses C1-C7 of the cart spec.
-"""
-from __future__ import annotations
-
+"""Shopping cart with promo codes."""
 from decimal import Decimal, ROUND_HALF_EVEN
 
 KNOWN_CODES = {"SAVE10", "SAVE20", "FLAT5", "BOGO_BAGEL", "FREESHIP"}
@@ -19,9 +14,9 @@ class Cart:
         self._codes: set[str] = set()
 
     def add_item(self, sku: str, qty: int, unit_price_cents: int) -> None:
-        if isinstance(qty, bool) or not isinstance(qty, int) or qty < 1:
+        if type(qty) is not int or qty < 1:
             raise ValueError(f"qty must be positive int, got {qty!r}")
-        if isinstance(unit_price_cents, bool) or not isinstance(unit_price_cents, int) or unit_price_cents < 0:
+        if type(unit_price_cents) is not int or unit_price_cents < 0:
             raise ValueError(f"unit_price_cents must be non-negative int, got {unit_price_cents!r}")
         if sku in self._items:
             raise ValueError(f"sku {sku!r} already in cart")
@@ -32,11 +27,9 @@ class Cart:
             return False
         if code in self._codes:
             return False
-        # SAVE10/SAVE20 mutual exclusion (C4).
-        if code in PERCENT_RATES:
-            other = "SAVE20" if code == "SAVE10" else "SAVE10"
-            if other in self._codes:
-                return False
+        # C4: SAVE10/SAVE20 mutually exclusive — reject if any percent code already applied.
+        if code in PERCENT_RATES and self._codes & PERCENT_RATES.keys():
+            return False
         self._codes.add(code)
         return True
 
@@ -51,15 +44,13 @@ class Cart:
         # C5 step 2: BOGO_BAGEL discount, evaluated against current items.
         if "BOGO_BAGEL" in self._codes and "bagel" in self._items:
             qty, price = self._items["bagel"]
-            free_units = qty // 2
-            subtotal -= free_units * price
+            subtotal -= (qty // 2) * price
 
         # C5 step 3: percent discount on post-BOGO subtotal, banker's rounded (C6).
         for code, rate in PERCENT_RATES.items():
             if code in self._codes:
                 raw = Decimal(subtotal) * rate
-                discount = int(raw.quantize(Decimal("1"), rounding=ROUND_HALF_EVEN))
-                subtotal -= discount
+                subtotal -= int(raw.quantize(Decimal("1"), rounding=ROUND_HALF_EVEN))
                 break  # mutual exclusion enforced in apply_code
 
         # C5 step 4: FLAT5 with clamp at 0.
@@ -67,7 +58,7 @@ class Cart:
             subtotal = max(0, subtotal - FLAT_DISCOUNT)
 
         # C5 step 5: shipping unless FREESHIP and post-discount subtotal >= 5000.
-        if not ("FREESHIP" in self._codes and subtotal >= FREESHIP_THRESHOLD):
+        if "FREESHIP" not in self._codes or subtotal < FREESHIP_THRESHOLD:
             subtotal += SHIPPING_FLAT
 
         return subtotal
