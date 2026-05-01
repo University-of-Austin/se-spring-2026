@@ -26,14 +26,13 @@ resolve without rework.
 
 ## Surprises
 
-Spec re-read surfaced a hidden cart bug the Phase 1 suite missed: a
-`_bogo_applied_before_bagel` latch set state at `apply_code` time,
-breaking spec C3's "if no bagel line item exists WHEN `total_cents` IS
-COMPUTED" wording. Calling `apply_code("BOGO_BAGEL")` before adding the
-bagel and then `total_cents()` should still apply BOGO; the latch zeroed
-it. Removing the flag and trusting the existing
-`"bagel" in self._items` check at compute time was the fix. LRU
-eviction sticks to physical dict size — expired but unaccessed entries
-still occupy slots until freed. For the merger, removing the in-place
-`intervals.sort()` (A9) dropped the input-position reorder (A11) as
-dead code.
+Two hidden corners surfaced on spec re-read. Cart C3 anchors the
+bagel-presence check at `total_cents()` time, but the buggy starter
+latched state at `apply_code()` via a `_bogo_applied_before_bagel`
+flag — apply BOGO before adding the bagel and the discount stayed
+zeroed. Removing the flag fixed it. LRU `put()` originally evicted by
+physical dict size, but spec C4 references `len(cache)` which per C7
+excludes expired entries — so a still-valid LRU could be evicted while
+an older expired entry kept its slot. Reaping expired entries before
+the eviction loop fixed it. For the merger, dropping the in-place
+`intervals.sort()` (A9) made the input-position reorder (A11) dead.
