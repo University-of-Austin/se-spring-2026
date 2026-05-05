@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BBS Terminal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0a0e14;
+    --fg: #c0caf5;
+    --dim: #565f89;
+    --accent: #7aa2f7;
+    --ok: #9ece6a;
+    --err: #f7768e;
+    --warn: #e0af68;
+    --user: #bb9af7;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--fg);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', 'Consolas', monospace;
+    font-size: 14px;
+  }
+  #screen {
+    box-sizing: border-box;
+    height: 100vh;
+    padding: 16px 24px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .line { padding: 1px 0; }
+  .dim { color: var(--dim); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+  .warn { color: var(--warn); }
+  .accent { color: var(--accent); }
+  .user { color: var(--user); font-weight: 600; }
+  .prompt-line {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .prompt-line .prefix { color: var(--accent); white-space: nowrap; }
+  #input {
+    flex: 1;
+    background: transparent; border: 0; outline: 0;
+    color: var(--fg);
+    font: inherit;
+    caret-color: var(--accent);
+  }
+  .banner {
+    color: var(--accent);
+    line-height: 1.1;
+  }
+</style>
+</head>
+<body>
+<div id="screen"></div>
+<script>
+const screen = document.getElementById('screen');
+const BASE = ''; // same origin
+
+// Session state is persisted in localStorage so reloads keep you logged in.
+let ME = localStorage.getItem('bbs_user') || null;
+let TOKEN = localStorage.getItem('bbs_token') || null;
+
+function setSession(username, token) {
+  ME = username;
+  TOKEN = token;
+  if (username) localStorage.setItem('bbs_user', username);
+  else localStorage.removeItem('bbs_user');
+  if (token) localStorage.setItem('bbs_token', token);
+  else localStorage.removeItem('bbs_token');
+}
+
+const HELP_LINES = [
+  'Commands:',
+  '  help                          show this list',
+  '  register <username> <pw>      create an account (POST /users, auto-login)',
+  '  login <username> <pw>         log in (POST /login, stores session token)',
+  '  logout                        end your session',
+  '  whoami                        show your active user',
+  '  users                         list all users',
+  '  user <username>               show a user profile',
+  '  boards                        list all boards',
+  '  post [#board] <message>       post (defaults to #general if no board given)',
+  '  read [#board] [N]             read the last N posts (optionally a board)',
+  '  search <keyword>              search posts by keyword',
+  '  mine                          show your own posts',
+  '  get <id>                      fetch a single post by id',
+  '  edit <id> <message>           edit one of your posts',
+  '  delete <id>                   delete one of your posts',
+  '  bio <text>                    set your bio (omit text to clear)',
+  '  clear                         clear the screen',
+  '',
+  'Tip: history with up/down arrows. Passwords must be >= 8 chars on register.',
+  'Tip: boards are tagged with a leading #. "post #tech hi" goes to the tech board.',
+];
+
+// Spheal, copied from A1's display.py. Each line has a per-line color so
+// the sprite has a subtle top-to-bottom gradient (cyan head, blue back,
+// pale belly, cyan flippers).
+const SPHEAL = [
+  ['            #+++**++++++++**#@                           ', '#7dcfff'],
+  ['           #+=---------====+++++**                       ', '#7dcfff'],
+  ['        %#*=-----------======++===+**                    ', '#7dcfff'],
+  ['     %##%*=-------===========+=======+#                  ', '#7aa2f7'],
+  ['  #*+==+*+=======+%=-*+================*%                ', '#7aa2f7'],
+  ['  *=-============*@@##+=================+#               ', '#2ac3de'],
+  ['  %+===============++=============..:===+*#              ', '#2ac3de'],
+  ['  =:=+*+=++=========+++==========-:..-=+++*              ', '#2ac3de'],
+  [' *.::::.:::-++++++++=::-===========-.:=++++*             ', '#7aa2f7'],
+  ['@-...........-..:-.........-+========+++++++@            ', '#c0caf5'],
+  ['+............-.=.............:=======+++++++*            ', '#c0caf5'],
+  ['-..............................:====--=+++++*            ', '#c0caf5'],
+  ['=................................-==+-=+++++*@           ', '#c0caf5'],
+  ['=.................................-++++++:++*@           ', '#c0caf5'],
+  ['#.................................:=++++=:.=*@@          ', '#c0caf5'],
+  [' -.................................-=++++-.+*++==*@      ', '#7dcfff'],
+  [' *...............................:::=++++++*+++*++++==*% ', '#7dcfff'],
+  ['  =............................:::::=+++++++++*++++++++=*', '#7aa2f7'],
+  ['   +:.......................::::::::=+++++*+++++++++++++%', '#7aa2f7'],
+  ['   *+-.................:::::::::::::-+++++++++++++++++*% ', '#2ac3de'],
+  ['  +:::--:.........:::::::::::::::::-+++++++++++++++**#%  ', '#2ac3de'],
+  [' #=====++=:::::::::::::::::::::::::::-*#**++++***##%     ', '#2ac3de'],
+  ['          %==--::::::::::::--::::......-*@@@@@           ', '#7dcfff'],
+  ['               %+====------=+*=-........:+               ', '#7dcfff'],
+  ['                                *==--:--=#               ', '#7dcfff'],
+];
+
+const TITLE_COLORS = ['#7dcfff', '#7aa2f7', '#2ac3de', '#bb9af7', '#9d7cd8'];
+const TITLE_LINES = [
+  '     ____  ____  ____  ',
+  '    | __ )| __ )/ ___| ',
+  '    |  _ \\|  _ \\\\___ \\ ',
+  '    | |_) | |_) |___) |',
+  '    |____/|____/|____/ ',
+];
+
+const BANNER_FOOTER = [
+  '',
+  '    BBS Terminal  v1.0   (FastAPI backend on ' + location.host + ')',
+  '    Type  help  for commands.',
+  '',
+];
+
+function out(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.textContent = text;
+  screen.appendChild(div);
+  screen.scrollTop = screen.scrollHeight;
+}
+
+function outHTML(html, cls) {
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.innerHTML = html;
+  screen.appendChild(div);
+  screen.scrollTop = screen.scrollHeight;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function api(method, path, { body, auth } = {}) {
+  const headers = { 'Accept': 'application/json' };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (auth) {
+    if (ME) headers['X-Username'] = ME;
+    if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
+  }
+  const resp = await fetch(BASE + path, {
+    method, headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let data = null;
+  const text = await resp.text();
+  if (text) {
+    try { data = JSON.parse(text); } catch { data = text; }
+  }
+  return { status: resp.status, ok: resp.ok, data };
+}
+
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function printPost(p) {
+  const ts = fmtTs(p.created_at);
+  const edited = p.updated_at ? ` <span class="dim">(edited ${esc(fmtTs(p.updated_at))})</span>` : '';
+  const board = p.board
+    ? `<span class="warn">#${esc(p.board)}</span> `
+    : '';
+  outHTML(
+    `<span class="dim">[${esc(ts)}]</span> <span class="dim">#${p.id}</span> ${board}<span class="user">${esc(p.username)}</span>: ${esc(p.message)}${edited}`
+  );
+}
+
+function printUser(u) {
+  const bio = u.bio ? esc(u.bio) : '<span class="dim">(no bio)</span>';
+  outHTML(
+    `<span class="user">${esc(u.username)}</span> <span class="dim">joined ${esc(fmtTs(u.created_at))}</span>  <span class="accent">${u.post_count}</span> <span class="dim">posts</span>\n  bio: ${bio}`
+  );
+}
+
+function printError(r, fallback) {
+  const detail = (r.data && r.data.detail) || fallback || 'error';
+  if (Array.isArray(detail)) {
+    out('error: ' + JSON.stringify(detail), 'err');
+  } else {
+    out(`error ${r.status}: ${detail}`, 'err');
+  }
+}
+
+// command registry
+const cmds = {};
+
+cmds.help = () => HELP_LINES.forEach(l => out(l, 'dim'));
+
+cmds.clear = () => { screen.innerHTML = ''; };
+
+cmds.whoami = () => {
+  if (ME && TOKEN) outHTML(`logged in as <span class="user">${esc(ME)}</span>`);
+  else if (ME) outHTML(`<span class="warn">stale session for</span> <span class="user">${esc(ME)}</span>  (try: login ${esc(ME)} &lt;pw&gt;)`);
+  else out('not logged in. use:  register <u> <pw>  or  login <u> <pw>', 'dim');
+};
+
+cmds.register = async (args) => {
+  if (args.length < 2) return out('usage: register <username> <password>  (password must be >= 8 chars)', 'warn');
+  const [username, password] = args;
+  const r = await api('POST', '/users', { body: { username, password } });
+  if (r.status === 201) {
+    outHTML(`<span class="ok">registered</span> <span class="user">${esc(username)}</span>`);
+    printUser(r.data);
+    // Auto-login after register.
+    const lr = await api('POST', '/login', { body: { username, password } });
+    if (lr.status === 200) {
+      setSession(username, lr.data.token);
+      out('auto-logged in.', 'ok');
+    } else {
+      out('registered, but auto-login failed. try:  login ' + username + ' <pw>', 'warn');
+    }
+  } else if (r.status === 409) {
+    out(`user "${username}" already exists`, 'warn');
+  } else if (r.status === 422) {
+    out('invalid username or password (username: 3-20 chars [a-zA-Z0-9_], password: 8+ chars)', 'err');
+  } else {
+    printError(r, 'could not register');
+  }
+};
+
+cmds.login = async (args) => {
+  if (args.length < 2) return out('usage: login <username> <password>', 'warn');
+  const [username, password] = args;
+  const r = await api('POST', '/login', { body: { username, password } });
+  if (r.status === 200) {
+    setSession(username, r.data.token);
+    outHTML(`<span class="ok">logged in as</span> <span class="user">${esc(username)}</span>`);
+  } else if (r.status === 401) {
+    out('invalid username or password', 'err');
+  } else {
+    printError(r, 'login failed');
+  }
+};
+
+cmds.logout = async () => {
+  if (!TOKEN) {
+    setSession(null, null);
+    return out('already logged out.', 'dim');
+  }
+  await api('POST', '/logout', { auth: true });
+  setSession(null, null);
+  out('logged out.', 'ok');
+};
+
+cmds.users = async () => {
+  const r = await api('GET', '/users');
+  if (!r.ok) return printError(r);
+  if (!r.data.length) return out('no users yet.', 'dim');
+  r.data.forEach(printUser);
+};
+
+cmds.user = async (args) => {
+  if (!args[0]) return out('usage: user <username>', 'warn');
+  const r = await api('GET', '/users/' + encodeURIComponent(args[0]));
+  if (r.status === 404) return out(`user "${args[0]}" not found`, 'err');
+  if (!r.ok) return printError(r);
+  printUser(r.data);
+};
+
+cmds.post = async (args, raw) => {
+  if (!TOKEN) return out('you must  login <u> <pw>  first', 'warn');
+  let text = raw.trim();
+  if (!text) return out('usage: post [#board] <message>', 'warn');
+
+  // If the first token starts with '#', treat it as the board name.
+  let board = undefined;
+  if (text.startsWith('#')) {
+    const sp = text.indexOf(' ');
+    if (sp === -1) return out('usage: post [#board] <message>', 'warn');
+    board = text.slice(1, sp).toLowerCase();
+    text = text.slice(sp + 1).trim();
+    if (!text) return out('usage: post [#board] <message>', 'warn');
+  }
+
+  const body = { message: text };
+  if (board) body.board = board;
+  const r = await api('POST', '/posts', { body, auth: true });
+  if (r.status === 201) {
+    out('posted.', 'ok');
+    printPost(r.data);
+  } else if (r.status === 401) {
+    out('your session is invalid. try logging in again.', 'err');
+  } else if (r.status === 404) {
+    out(`user "${ME}" doesn't exist on the server`, 'err');
+  } else if (r.status === 422) {
+    out('invalid input. board must match ^[a-z0-9_-]+$ and be <= 30 chars; message 1-500 chars.', 'err');
+  } else {
+    printError(r);
+  }
+};
+
+cmds.read = async (args) => {
+  // Accept `read`, `read 50`, `read #tech`, `read #tech 50`, `read 50 #tech`.
+  let board = null;
+  let limit = 20;
+  for (const a of args) {
+    if (a.startsWith('#')) board = a.slice(1).toLowerCase();
+    else {
+      const n = parseInt(a, 10);
+      if (!isNaN(n)) limit = n;
+    }
+  }
+  limit = Math.min(Math.max(limit, 1), 200);
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (board) params.set('board', board);
+  const r = await api('GET', '/posts?' + params.toString());
+  if (!r.ok) return printError(r);
+  if (!r.data.length) {
+    return out(board ? `no posts in #${board} yet.` : 'no posts yet.', 'dim');
+  }
+  // Show oldest-first so the newest ends up at the bottom near the prompt.
+  r.data.slice().reverse().forEach(printPost);
+};
+
+cmds.boards = async () => {
+  const r = await api('GET', '/boards');
+  if (!r.ok) return printError(r);
+  if (!r.data.length) return out('no boards yet.', 'dim');
+  r.data.forEach(b => {
+    outHTML(
+      `<span class="warn">#${esc(b.name)}</span>  <span class="accent">${b.post_count}</span> <span class="dim">posts  (created ${esc(fmtTs(b.created_at))})</span>`
+    );
+  });
+};
+
+cmds.search = async (args) => {
+  if (!args[0]) return out('usage: search <keyword>', 'warn');
+  const q = args.join(' ');
+  const r = await api('GET', '/posts?q=' + encodeURIComponent(q));
+  if (!r.ok) return printError(r);
+  if (!r.data.length) return out('no matches.', 'dim');
+  r.data.slice().reverse().forEach(printPost);
+};
+
+cmds.mine = async () => {
+  if (!ME) return out('you must  login <u> <pw>  first', 'warn');
+  const r = await api('GET', '/posts?username=' + encodeURIComponent(ME));
+  if (!r.ok) return printError(r);
+  if (!r.data.length) return out(`no posts by ${ME}.`, 'dim');
+  r.data.slice().reverse().forEach(printPost);
+};
+
+cmds.get = async (args) => {
+  if (!args[0]) return out('usage: get <id>', 'warn');
+  const r = await api('GET', '/posts/' + encodeURIComponent(args[0]));
+  if (r.status === 404) return out(`post #${args[0]} not found`, 'err');
+  if (!r.ok) return printError(r);
+  printPost(r.data);
+};
+
+cmds.delete = async (args) => {
+  if (!args[0]) return out('usage: delete <id>', 'warn');
+  if (!TOKEN) return out('you must  login <u> <pw>  first', 'warn');
+  const r = await api('DELETE', '/posts/' + encodeURIComponent(args[0]), { auth: true });
+  if (r.status === 204) return outHTML(`<span class="ok">deleted post</span> <span class="dim">#${esc(args[0])}</span>`);
+  if (r.status === 403) return out(`post #${args[0]} isn't yours to delete`, 'err');
+  if (r.status === 404) return out(`post #${args[0]} not found`, 'err');
+  printError(r);
+};
+
+cmds.edit = async (args, raw) => {
+  if (!TOKEN) return out('you must  login <u> <pw>  first', 'warn');
+  if (!args[0]) return out('usage: edit <id> <message>', 'warn');
+  const id = args[0];
+  const message = raw.slice(raw.indexOf(id) + id.length).trim();
+  if (!message) return out('usage: edit <id> <message>', 'warn');
+  const r = await api('PATCH', '/posts/' + encodeURIComponent(id), { body: { message }, auth: true });
+  if (r.status === 200) {
+    out('edited.', 'ok');
+    printPost(r.data);
+  } else if (r.status === 403) {
+    out(`post #${id} isn't yours to edit`, 'err');
+  } else if (r.status === 404) {
+    out(`post #${id} not found`, 'err');
+  } else {
+    printError(r);
+  }
+};
+
+cmds.bio = async (args, raw) => {
+  if (!TOKEN) return out('you must  login <u> <pw>  first', 'warn');
+  const bio = raw.trim();
+  const r = await api('PATCH', '/users/' + encodeURIComponent(ME), { body: { bio: bio || null }, auth: true });
+  if (r.status === 200) {
+    out('bio updated.', 'ok');
+    printUser(r.data);
+  } else {
+    printError(r);
+  }
+};
+
+// command dispatcher
+async function run(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  const space = trimmed.indexOf(' ');
+  const cmd = (space === -1 ? trimmed : trimmed.slice(0, space)).toLowerCase();
+  const rest = space === -1 ? '' : trimmed.slice(space + 1);
+  const args = rest.length ? rest.split(/\s+/) : [];
+  const fn = cmds[cmd];
+  if (!fn) return out(`unknown command: ${cmd}. try  help`, 'err');
+  try {
+    await fn(args, rest);
+  } catch (e) {
+    out('client error: ' + e.message, 'err');
+  }
+}
+
+// prompt
+let history = JSON.parse(localStorage.getItem('bbs_history') || '[]');
+let histIdx = history.length;
+let draft = '';
+let promptLine = null;
+
+function showPrompt() {
+  promptLine = document.createElement('div');
+  promptLine.className = 'prompt-line line';
+  const prefix = document.createElement('span');
+  prefix.className = 'prefix';
+  prefix.textContent = (ME ? ME : 'guest') + '@bbs>';
+  const input = document.createElement('input');
+  input.id = 'input';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.addEventListener('keydown', onKey);
+  promptLine.appendChild(prefix);
+  promptLine.appendChild(input);
+  screen.appendChild(promptLine);
+  input.focus();
+  screen.scrollTop = screen.scrollHeight;
+}
+
+async function onKey(e) {
+  const input = e.currentTarget;
+  if (e.key === 'Enter') {
+    const value = input.value;
+    // "freeze" the prompt line as plain text and append value
+    const prefix = promptLine.querySelector('.prefix').textContent;
+    promptLine.innerHTML = `<span class="prefix">${esc(prefix)}</span> ${esc(value)}`;
+    promptLine = null;
+    if (value.trim()) {
+      history.push(value);
+      if (history.length > 200) history = history.slice(-200);
+      localStorage.setItem('bbs_history', JSON.stringify(history));
+    }
+    histIdx = history.length;
+    draft = '';
+    await run(value);
+    showPrompt();
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (histIdx === history.length) draft = input.value;
+    if (histIdx > 0) {
+      histIdx--;
+      input.value = history[histIdx];
+      setTimeout(() => input.setSelectionRange(input.value.length, input.value.length), 0);
+    }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (histIdx < history.length) {
+      histIdx++;
+      input.value = histIdx === history.length ? draft : history[histIdx];
+      setTimeout(() => input.setSelectionRange(input.value.length, input.value.length), 0);
+    }
+  } else if (e.key === 'l' && e.ctrlKey) {
+    e.preventDefault();
+    cmds.clear();
+  }
+}
+
+// keep focus on the input even when clicking elsewhere in the screen
+document.addEventListener('click', () => {
+  const i = document.getElementById('input');
+  if (i) i.focus();
+});
+
+// boot
+out('');
+SPHEAL.forEach(([text, color]) => {
+  outHTML(`<span style="color:${color}">${esc(text)}</span>`);
+});
+out('');
+TITLE_LINES.forEach((line, i) => {
+  outHTML(`<span style="color:${TITLE_COLORS[i % TITLE_COLORS.length]}">${esc(line)}</span>`);
+});
+BANNER_FOOTER.forEach(l => out(l, 'banner'));
+if (ME) outHTML(`<span class="dim">resumed session as</span> <span class="user">${esc(ME)}</span>`);
+showPrompt();
+</script>
+</body>
+</html>
