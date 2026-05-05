@@ -1,5 +1,17 @@
 .DS_Store
-__pycache__/
-*.db
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Test caches
 .pytest_cache/
+
+# SQLite databases
+*.db
+*.db-journal
+
+# Python virtualenvs
+.venv/
+venv/
