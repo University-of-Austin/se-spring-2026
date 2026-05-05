@@ -1,0 +1,4 @@
+bbs.json
+bbs.db
+__pycache__/
+*.pyc
