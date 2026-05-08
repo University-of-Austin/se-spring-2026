@@ -1,73 +1,47 @@
-# React + TypeScript + Vite
+# BBS Frontend (A4) — astarinmymind
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React frontend for [my A2 BBS API](../../bbs-webserver/astarinmymind/). UATX Software Engineering Spring 2026.
 
-Currently, two official plugins are available:
+## How to run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+# Backend (separate terminal, in your A2 dir)
+uvicorn main:app --port 8000
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Frontend
+npm install
+npm run dev   # → http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The frontend reads `VITE_API_BASE` (default `http://localhost:8000`).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Backend changes for this frontend: *(to fill in — see Phase 2 CORS step)*
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Tier targeted
+
+**Gold.** Picked options B (time-aware dark mode), C (Playwright e2e tests), D (visual design with a point of view).
+
+## Design decisions
+
+- All my backend calls go through one wrapper (`api/client.ts`) instead of inline `fetch()` calls in each hook, so URL, `X-Username` header, JSON parsing, and error handling all live in one place.
+- The current username lives in a React Context (`UserContext`) backed by localStorage, so the header, compose form, and delete button can all read it directly instead of having `username` threaded through every component layer between.
+- All routes share one `Layout` component (header + page slot via `<Outlet />`) instead of every page file repeating its own header — keeps the header consistent and the theme toggle / sign-in display only need to be wired in one place.
+
+## Tests
+
+```sh
+npx playwright test
 ```
+
+*(arrives in Phase 5)*
+
+## Where my agent helped most and where I pushed back
+
+- Agent recommended going straight to gold architecture instead of iterating bronze → silver → gold, to avoid throwaway code from rewrites.
+- Agent said to do step 1.2 (Tailwind color tokens) immediately because every component will use them.
+- Agent explained `react-router-dom` is a library that maps URLs to React components, like FastAPI routes on the frontend.
+- Agent suggested the Tailwind CSS IntelliSense VS Code extension (`bradlc.vscode-tailwindcss`) for inline color previews and class autocomplete.
+- Agent suggested defining TypeScript types for `User` and `Post` so the compiler catches typos and shape mismatches before runtime.
+- Agent confirmed defaulting to GET in my fetch wrapper is the universal convention — matches the HTTP spec, native `fetch`, axios, and every popular HTTP library.
+- Agent introduced me to `Link`, `Outlet`, and `useNavigate` from react-router-dom — the SPA equivalents of `<a>`, a child-route placeholder slot, and programmatic URL changes.
+- Agent suggested a single `api/client.ts` wrapper around `fetch` so base URL, `X-Username` header, and error handling live in one place instead of being repeated at every call site.
