@@ -21,9 +21,16 @@ export class ApiError extends Error {
 
 // Generic <T> = "the type of the response body the caller expects."
 // e.g., api<Post[]>('/posts') returns Promise<Post[]>.
+// `signal` lets the caller cancel an in-flight request (used by usePosts to
+// abort a stale fetch when filters change — see Lecture 6.1).
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown; username?: string | null } = {}
+  options: {
+    method?: string
+    body?: unknown
+    username?: string | null
+    signal?: AbortSignal
+  } = {}
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (options.username) headers['X-Username'] = options.username
@@ -32,13 +39,22 @@ export async function api<T>(
     method: options.method ?? 'GET',
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: options.signal,
   })
 
   // 4xx / 5xx — try to read the FastAPI {detail: ...} body, fall back to status text.
+  // FastAPI uses two shapes: a string for HTTPException(detail="...") and an
+  // array of {loc, msg, type} for Pydantic 422 validation errors. Normalize both
+  // into a plain string so callers (and the UI) never see the raw array.
   if (!res.ok) {
     let detail = res.statusText
     try {
-      detail = (await res.json()).detail ?? detail
+      const body = await res.json()
+      if (Array.isArray(body.detail)) {
+        detail = body.detail.map((d: { msg: string }) => d.msg).join('; ')
+      } else if (typeof body.detail === 'string') {
+        detail = body.detail
+      }
     } catch {
       // body wasn't JSON; keep the statusText fallback
     }
