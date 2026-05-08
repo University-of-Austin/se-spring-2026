@@ -3,6 +3,7 @@
 
 import { Link } from 'react-router-dom'
 import type { Post } from '../types'
+import { UserLink } from './UserLink'
 
 export function PostCard({ post }: { post: Post }) {
   return (
@@ -11,12 +12,7 @@ export function PostCard({ post }: { post: Post }) {
       <p className="whitespace-pre-wrap text-text">{post.message}</p>
 
       <div className="flex items-center justify-between text-sm text-muted">
-        <Link
-          to={`/users/${post.username}`}
-          className="text-accent hover:underline"
-        >
-          @{post.username}
-        </Link>
+        <UserLink username={post.username} />
         <Link
           to={`/posts/${post.id}`}
           className="font-mono hover:text-text"

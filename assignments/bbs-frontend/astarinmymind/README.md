@@ -29,6 +29,7 @@ Added `CORSMiddleware` to `main.py` so the Vite dev server (`localhost:5173`) ca
 - The current username lives in a React Context (`UserContext`) backed by localStorage, so the header, compose form, and delete button can all read it directly instead of having `username` threaded through every component layer between.
 - All routes share one `Layout` component (header + page slot via `<Outlet />`) instead of every page file repeating its own header — keeps the header consistent and the theme toggle / sign-in display only need to be wired in one place.
 - On sign-in I verify the username exists via `GET /users/{name}` before claiming it, even though `X-Username` isn't real auth — better to catch a typo at sign-in than to let someone "sign in" as a nonexistent user and only discover it when their first post 404s.
+- Four read hooks, one per GET endpoint (`usePosts`, `useUsers`, `useUser`, `usePost`) — each one owns its own fetch + loading/error state, so the pages just call it and render what comes back. Same return shape across all four means every consuming page looks identical.
 
 ## Tests
 
@@ -48,4 +49,32 @@ npx playwright test
 - Agent confirmed defaulting to GET in my fetch wrapper is the universal convention — matches the HTTP spec, native `fetch`, axios, and every popular HTTP library.
 - Agent introduced me to `Link`, `Outlet`, and `useNavigate` from react-router-dom — the SPA equivalents of `<a>`, a child-route placeholder slot, and programmatic URL changes.
 - Agent first wrote a cancelled-flag race guard in `usePosts`; I pointed at Lecture 6.1's `AbortController` pattern and asked to use that instead, since it actually cancels the in-flight fetch and matches what we covered in class.
+- Agent introduced me to `Promise.all` for firing parallel API calls — used in `useUser` to fetch the user info and their posts simultaneously instead of sequentially.
+
+## Concepts I picked up along the way
+
+### `Promise.all`
+
+Fires multiple async operations at the same time and resolves once all complete. If any rejects, the whole thing rejects. Without it, you'd `await` the first call, then `await` the second sequentially — that's twice as slow because the second only starts after the first finishes.
+
+```
+sequential: [────fetch user────][────fetch posts────]   → 2x as long
+parallel:   [────fetch user────]                       → bottleneck = slower one
+            [────fetch posts───]
+```
+
+Two API calls is the threshold where `Promise.all` actually matters; any more and it matters more.
+
+### Four-branch render (known 404 vs. generic error)
+
+Pages that can fail in a *known* way ("this user doesn't exist") and a *generic* way (network died, server crashed) deserve different UI. That's why `UserProfilePage` and `PostDetailPage` have **four** render branches instead of three:
+
+```tsx
+if (loading) return <Spinner />
+if (error instanceof ApiError && error.status === 404) return <NotFoundView />
+if (error) return <ErrorMessage error={error} />
+return <ContentView />
+```
+
+The `instanceof ApiError && status === 404` check is exactly why I threw a typed `ApiError` from `client.ts` instead of a plain `Error` — the `status` field lets pages branch on specific HTTP outcomes without parsing strings.
 - Agent suggested a single `api/client.ts` wrapper around `fetch` so base URL, `X-Username` header, and error handling live in one place instead of being repeated at every call site.
