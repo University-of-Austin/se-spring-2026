@@ -40,3 +40,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Hide scrollbar in containers using `scrollbar-hide` while preserving scroll */
+.scrollbar-hide {
+  scrollbar-width: none;        /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                /* Chrome, Safari, Edge */
+}

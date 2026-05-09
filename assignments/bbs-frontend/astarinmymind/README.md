@@ -30,6 +30,7 @@ Added `CORSMiddleware` to `main.py` so the Vite dev server (`localhost:5173`) ca
 - All routes share one `Layout` component (header + page slot via `<Outlet />`) instead of every page file repeating its own header — keeps the header consistent and the theme toggle / sign-in display only need to be wired in one place.
 - On sign-in I verify the username exists via `GET /users/{name}` before claiming it, even though `X-Username` isn't real auth — better to catch a typo at sign-in than to let someone "sign in" as a nonexistent user and only discover it when their first post 404s.
 - Four read hooks, one per GET endpoint (`usePosts`, `useUsers`, `useUser`, `usePost`) — each one owns its own fetch + loading/error state, so the pages just call it and render what comes back. Same return shape across all four means every consuming page looks identical.
+- Pagination is infinite scroll inside a fixed-height post window (~3 posts visible at a time) — an `IntersectionObserver` watches a sentinel near the bottom of the scroll area and fetches the next page when it approaches view, instead of a "Load more" button.
 
 ## Tests
 
@@ -77,4 +78,19 @@ return <ContentView />
 ```
 
 The `instanceof ApiError && status === 404` check is exactly why I threw a typed `ApiError` from `client.ts` instead of a plain `Error` — the `status` field lets pages branch on specific HTTP outcomes without parsing strings.
+
+### Debouncing user input
+
+Wraps a frequent event (typing, scrolling) so the actual handler only fires after a *quiet period*. Each new event cancels the previous schedule and starts a fresh countdown. Used in the search box so a fetch only goes out once typing pauses.
+
+```
+keystrokes:    h  a  i  ku                       (idle 300ms)
+timers:        |  |  |  |
+               ✕  ✕  ✕  ✕ ────[300ms]──▶ FIRES: setDebouncedSearch("haiku")
+                          ↑ each prior timer cleared by next keystroke
+```
+
+Without it, typing "haiku" = 5 fetches (`?q=h`, `?q=ha`, …). With it, 1 fetch for `?q=haiku`. Saves backend load AND avoids race conditions where the `?q=h` response could arrive after the `?q=haiku` response and overwrite it.
+
+Threshold: 300ms is the common default. Google uses ~150ms; sluggish forms 500ms+.
 - Agent suggested a single `api/client.ts` wrapper around `fetch` so base URL, `X-Username` header, and error handling live in one place instead of being repeated at every call site.

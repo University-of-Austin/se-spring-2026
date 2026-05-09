@@ -36,7 +36,7 @@ export default function UserProfilePage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2 border-b border-border pb-4">
+      <header className="space-y-2">
         <h1 className="font-serif text-3xl">@{user.username}</h1>
         {user.bio && <p className="text-text">{user.bio}</p>}
         <p className="text-sm text-muted font-mono">
@@ -46,15 +46,19 @@ export default function UserProfilePage() {
         </p>
       </header>
 
-      <div>
-        <h2 className="font-serif text-xl mb-3">Posts</h2>
-        {posts.length === 0
-          ? <p className="text-muted">No posts yet.</p>
-          : <div className="space-y-3">
-              {posts.map(post => <PostCard key={post.id} post={post} />)}
-            </div>
-        }
-      </div>
+      {posts.length === 0
+        ? <p className="text-muted">No posts yet.</p>
+        : <div
+            // calc(100vh - 240px) makes the box fill what remains below the
+            // header so it ends at roughly the same distance from the page
+            // bottom as the feed's scroll window.
+            style={{ maxHeight: 'calc(100vh - 240px)' }}
+            className="space-y-3 overflow-y-auto scrollbar-hide"
+            aria-live="polite"
+          >
+            {posts.map(post => <PostCard key={post.id} post={post} />)}
+          </div>
+      }
     </div>
   )
 }

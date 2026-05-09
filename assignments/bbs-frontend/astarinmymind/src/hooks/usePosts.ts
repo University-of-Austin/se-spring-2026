@@ -13,6 +13,9 @@ export function usePosts(filters: Filters = {}) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [refetchKey, setRefetchKey] = useState(0)
+  // Size of the most recent fetch's response — pages use this to decide
+  // whether a "Load more" button should still be shown (full page = maybe more).
+  const [lastFetchSize, setLastFetchSize] = useState<number | null>(null)
 
   useEffect(() => {
     // Race-condition guard via AbortController (Lecture 6.1, slide 5).
@@ -31,7 +34,14 @@ export function usePosts(filters: Filters = {}) {
     const qs = params.toString() ? `?${params}` : ''
 
     api<Post[]>(`/posts${qs}`, { signal: controller.signal })
-      .then(setPosts)
+      .then(data => {
+        // offset > 0 means "Load more" — append the new page to existing posts.
+        // offset === 0 (or undefined) means "fresh load / search" — replace.
+        setPosts(prev =>
+          filters.offset && filters.offset > 0 ? [...prev, ...data] : data
+        )
+        setLastFetchSize(data.length)
+      })
       .catch((err: Error) => {
         // AbortError = expected (we triggered the abort ourselves), ignore.
         if (err.name === 'AbortError' || controller.signal.aborted) return
@@ -55,6 +65,7 @@ export function usePosts(filters: Filters = {}) {
     posts,
     loading,
     error,
+    lastFetchSize,
     refetch: () => setRefetchKey(k => k + 1),
     addOptimistic,
     removeOptimistic,
