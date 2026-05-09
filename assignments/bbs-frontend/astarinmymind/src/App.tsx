@@ -4,6 +4,7 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { UserProvider } from './context/UserContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { Layout } from './components/Layout'
 
 import FeedPage from './pages/FeedPage'
@@ -16,8 +17,9 @@ import NotFoundPage from './pages/NotFoundPage'
 function App() {
   return (
     <BrowserRouter>
-      <UserProvider>
-        <Routes>
+      <ThemeProvider>
+        <UserProvider>
+          <Routes>
           {/* Layout route: this <Route> has no `path`, just an `element`. It wraps
               all the child routes below, so every page renders inside <Layout>. */}
           <Route element={<Layout />}>
@@ -28,8 +30,9 @@ function App() {
             <Route path="/signin" element={<SignInPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
-        </Routes>
-      </UserProvider>
+          </Routes>
+        </UserProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

@@ -4,12 +4,13 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { usePost } from '../hooks/usePost'
-import { useCurrentUser } from '../context/UserContext'
+import { useCurrentUser } from '../context/useCurrentUser'
 import { deletePost } from '../api/posts'
 import { ApiError } from '../api/client'
 import { UserLink } from '../components/UserLink'
 import { Spinner } from '../components/Spinner'
 import { ErrorMessage } from '../components/ErrorMessage'
+import { formatTimestamp } from '../lib/format'
 
 export default function PostDetailPage() {
   const { id: idParam = '' } = useParams()
@@ -39,8 +40,8 @@ export default function PostDetailPage() {
   if (Number.isNaN(id)) {
     return (
       <div className="text-center py-12 space-y-3">
-        <h1 className="font-serif text-3xl">Invalid post id</h1>
-        <Link to="/" className="text-accent hover:underline">← Back to feed</Link>
+        <h1 className="font-serif text-4xl font-bold">Invalid post id</h1>
+        <Link to="/" className="underline underline-offset-2 decoration-muted/60 hover:text-accent hover:decoration-accent transition-colors">← Back to feed</Link>
       </div>
     )
   }
@@ -51,9 +52,9 @@ export default function PostDetailPage() {
   if (error instanceof ApiError && error.status === 404) {
     return (
       <div className="text-center py-12 space-y-3">
-        <h1 className="font-serif text-3xl">Post not found</h1>
+        <h1 className="font-serif text-4xl font-bold">Post not found</h1>
         <p className="text-muted">No post with id #{id} exists.</p>
-        <Link to="/" className="text-accent hover:underline">← Back to feed</Link>
+        <Link to="/" className="underline underline-offset-2 decoration-muted/60 hover:text-accent hover:decoration-accent transition-colors">← Back to feed</Link>
       </div>
     )
   }
@@ -65,10 +66,10 @@ export default function PostDetailPage() {
     <article className="space-y-4">
       <p className="whitespace-pre-wrap text-text text-lg">{post.message}</p>
 
-      <div className="flex items-center justify-between text-sm text-muted border-b border-border pb-3">
+      <div className="flex items-center justify-between text-sm text-muted">
         <UserLink username={post.username} />
-        <span className="font-mono">
-          {new Date(post.created_at).toLocaleString()}
+        <span>
+          {formatTimestamp(post.created_at)}
           {post.updated_at && <span className="ml-1">(edited)</span>}
         </span>
       </div>

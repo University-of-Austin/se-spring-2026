@@ -11,7 +11,7 @@ export default function UserListPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-serif text-3xl">Users</h1>
+      <h1 className="font-serif text-4xl font-bold">Users</h1>
 
       {loading && <Spinner />}
       {error && <ErrorMessage error={error} />}

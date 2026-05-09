@@ -5,16 +5,18 @@
 import { Link } from 'react-router-dom'
 import type { Post } from '../types'
 import { UserLink } from './UserLink'
+import { formatTimestamp } from '../lib/format'
 
 export function PostCard({ post }: { post: Post }) {
   return (
-    <article className="relative rounded border border-border p-4 space-y-2 hover:border-text/30 transition-colors">
+    <article className="animate-post-in relative rounded border border-border p-4 space-y-2 hover:bg-highlight hover:border-accent transition-colors">
       {/* Stretched link: invisible, covers the whole card → /posts/:id.
           Anything that should NOT navigate to the post (i.e. UserLink) gets
           `relative z-10` so it sits above this and captures clicks first. */}
       <Link
         to={`/posts/${post.id}`}
         aria-label={`Open post #${post.id}`}
+        data-no-active-bg
         className="absolute inset-0"
       />
 
@@ -23,8 +25,8 @@ export function PostCard({ post }: { post: Post }) {
 
       <div className="flex items-center justify-between text-sm text-muted">
         <UserLink username={post.username} className="relative z-10" />
-        <span className="font-mono">
-          {new Date(post.created_at).toLocaleString()}
+        <span>
+          {formatTimestamp(post.created_at)}
           {post.updated_at && <span className="ml-1">(edited)</span>}
         </span>
       </div>

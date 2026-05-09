@@ -2,9 +2,8 @@
 // Search is debounced 300ms — typing fast doesn't fire a request per keystroke.
 
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { usePosts } from '../hooks/usePosts'
-import { useCurrentUser } from '../context/UserContext'
+import { useCurrentUser } from '../context/useCurrentUser'
 import { PostCard } from '../components/PostCard'
 import { Spinner } from '../components/Spinner'
 import { ErrorMessage } from '../components/ErrorMessage'
@@ -64,6 +63,17 @@ export default function FeedPage() {
     return () => document.removeEventListener('keydown', handleKey)
   }, [])
 
+  // Poll for new posts when signed out, no search active, on first page.
+  // Signed-in users already get optimistic updates from their own composes,
+  // so polling there would mostly be redundant.
+  useEffect(() => {
+    if (username) return
+    if (debouncedSearch) return
+    if (offset !== 0) return
+    const id = setInterval(() => refetch(), 3000)
+    return () => clearInterval(id)
+  }, [username, debouncedSearch, offset, refetch])
+
   // Reset pagination on any search change so the next fetch starts at offset 0.
   // (If we didn't, mid-pagination + new search would APPEND results to existing.)
   const handleSearchChange = (v: string) => {
@@ -102,18 +112,12 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-serif text-3xl">Feed</h1>
-
-      {username ? (
+      {username && (
         <ComposeForm
           onPosted={handlePosted}
           addOptimistic={addOptimistic}
           removeOptimistic={removeOptimistic}
         />
-      ) : (
-        <p className="text-sm text-muted">
-          <Link to="/signin" className="text-accent hover:underline">Sign in</Link> to post.
-        </p>
       )}
 
       <SearchBar value={searchInput} onChange={handleSearchChange} ref={searchInputRef} />

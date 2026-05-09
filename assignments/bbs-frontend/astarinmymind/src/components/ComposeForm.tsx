@@ -14,7 +14,7 @@
 
 import { useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
-import { useCurrentUser } from '../context/UserContext'
+import { useCurrentUser } from '../context/useCurrentUser'
 import { createPost } from '../api/posts'
 import { ApiError } from '../api/client'
 import type { Post } from '../types'

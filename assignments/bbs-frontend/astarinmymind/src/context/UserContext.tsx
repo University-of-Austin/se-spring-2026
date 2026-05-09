@@ -1,21 +1,14 @@
-// Holds the current "logged in" username for the whole app.
-// Backed by localStorage so a refresh doesn't kick the user out.
+// Provider for the current signed-in user. Backed by localStorage so a
+// refresh doesn't kick the user out.
 //
 // Pattern: <UserProvider> wraps the app once (in App.tsx). Any component
-// then calls `useCurrentUser()` to read or update the username. No prop drilling.
+// reads/updates the username via `useCurrentUser()` from ./useCurrentUser.
+// The Context object itself lives in that file (alongside the hook) so
+// this file can stay components-only — fast-refresh stays granular.
 
-import { createContext, useContext, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-
-// The shape of what useCurrentUser() returns.
-type UserContextValue = {
-  username: string | null
-  setUsername: (u: string | null) => void
-}
-
-// The Context object itself. `null` is the default if no provider is mounted —
-// we throw a helpful error in that case (see useCurrentUser below).
-const UserContext = createContext<UserContextValue | null>(null)
+import { UserContext } from './useCurrentUser'
 
 export function UserProvider({ children }: { children: ReactNode }) {
   // Lazy initializer: the function only runs once, on first render.
@@ -37,11 +30,4 @@ export function UserProvider({ children }: { children: ReactNode }) {
       {children}
     </UserContext.Provider>
   )
-}
-
-// Custom hook every component uses to read/update the current user.
-export function useCurrentUser() {
-  const ctx = useContext(UserContext)
-  if (!ctx) throw new Error('useCurrentUser must be used inside <UserProvider>')
-  return ctx
 }

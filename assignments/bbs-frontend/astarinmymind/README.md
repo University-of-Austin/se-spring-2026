@@ -1,7 +1,3 @@
-# BBS Frontend (A4) — astarinmymind
-
-A React frontend for [my A2 BBS API](../../bbs-webserver/astarinmymind/). UATX Software Engineering Spring 2026.
-
 ## How to run
 
 ```sh
@@ -21,7 +17,14 @@ Added `CORSMiddleware` to `main.py` so the Vite dev server (`localhost:5173`) ca
 
 ## Tier targeted
 
-**Gold.** Picked options B (time-aware dark mode), C (Playwright e2e tests), D (visual design with a point of view).
+**Gold.** Picked four of the four gold options.
+
+### Gold features
+
+- **A · Real-time-ish updates (polling).** When you're signed out and on `/`, the feed refetches GET `/posts` every 3 seconds (gated off when a search is active or you've paginated past the first page so the poll can't clobber your scroll position). Polling fits because my A2 doesn't expose SSE/websockets and a 3-second cadence is cheap and good enough for a BBS where a freshly-posted message appearing within a few seconds is fine. Seen visually as new posts sliding in at the top via the `animate-post-in` keyframe.
+- **B · Dark mode (a real, persisted UI feature).** Two-state light/dark toggle in the header. On first visit it follows `prefers-color-scheme`; once you click the toggle, that pick is saved to `localStorage` and stops following OS changes (you made an explicit choice). The whole color system is variable-driven, so flipping `<html>`'s `dark` class swaps every Tailwind color utility in one move.
+- **C · Real automated tests proving the user flow.** Playwright spec in `tests/flow.spec.ts` runs against a live `npm run dev` and a live A2 backend — no mocks. Test #1 covers the spec's required flow exactly: create user → sign in → post → see in feed → delete. See the **Tests** section for the full list and how to run them.
+- **D · Visual design with a point of view.** Patterned after [Steph Ango's stephango.com](https://stephango.com/): Flexoki turquoise palette, kepano's font stack, breadcrumb-style header (`BBS / @daniel`), generous top whitespace, kepano-style date formatting, click-down mint highlight on links and buttons (`:active` pseudo-class), and underlined inline links instead of accent-colored text.
 
 ## Design decisions
 
@@ -31,14 +34,37 @@ Added `CORSMiddleware` to `main.py` so the Vite dev server (`localhost:5173`) ca
 - On sign-in I verify the username exists via `GET /users/{name}` before claiming it, even though `X-Username` isn't real auth — better to catch a typo at sign-in than to let someone "sign in" as a nonexistent user and only discover it when their first post 404s.
 - Four read hooks, one per GET endpoint (`usePosts`, `useUsers`, `useUser`, `usePost`) — each one owns its own fetch + loading/error state, so the pages just call it and render what comes back. Same return shape across all four means every consuming page looks identical.
 - Pagination is infinite scroll inside a fixed-height post window (~3 posts visible at a time) — an `IntersectionObserver` watches a sentinel near the bottom of the scroll area and fetches the next page when it approaches view, instead of a "Load more" button.
+- Click-and-hold on any link or button fills it with pale mint (`:active` state, kepano-style) — small UX touch that makes click feedback feel immediate without needing a separate animation.
 
 ## Tests
 
+Playwright e2e suite — drives a real Chromium against my running frontend, which calls my real A2 backend. No mocks. Backend on `:8000` and frontend on `:5173` need to be running first.
+
 ```sh
-npx playwright test
+# fast (default) — headless, ~4 seconds
+npm test
+
+# watch the robot click — opens a real Chrome window
+npx playwright test --headed
+
+# slow it down so each action is readable (env var, milliseconds between actions)
+SLOWMO=1500 npx playwright test --headed
+
+# best for poking at one test — interactive UI with a step timeline
+npx playwright test --ui
 ```
 
-*(arrives in Phase 5)*
+What the 9 tests cover:
+
+1. **Gold C user flow** — create user → sign in → post → see in feed → click into detail → delete.
+2. **Switch user** — sign in as A → sign out → sign in as B → confirm @A is gone, @B is shown.
+3. **Routing** — `/users` lists users, clicking one lands on `/users/<name>`.
+4. **404 view** — `/users/<unknown>` renders the "User not found" branch.
+5. **localStorage persistence** — sign in → reload → still signed in (the bronze "stay logged in across refresh" requirement).
+6. **Validation** — Post button is disabled when the textarea is empty, re-enables on typing.
+7. **Theme persists** — toggle the theme, reload, the choice survives (gold B).
+8. **Cmd+Enter posts** — pressing Meta+Enter inside the compose textarea fires the post (silver shortcut).
+9. **`?` opens the shortcut overlay** — and Escape closes it.
 
 ## Where my agent helped most and where I pushed back
 
@@ -51,6 +77,15 @@ npx playwright test
 - Agent introduced me to `Link`, `Outlet`, and `useNavigate` from react-router-dom — the SPA equivalents of `<a>`, a child-route placeholder slot, and programmatic URL changes.
 - Agent first wrote a cancelled-flag race guard in `usePosts`; I pointed at Lecture 6.1's `AbortController` pattern and asked to use that instead, since it actually cancels the in-flight fetch and matches what we covered in class.
 - Agent introduced me to `Promise.all` for firing parallel API calls — used in `useUser` to fetch the user info and their posts simultaneously instead of sequentially.
+
+## ESLint suppressions
+
+Two rules surface in this codebase. I documented each here so a reviewer can see what I evaluated vs. what I cut corners on:
+
+| Rule | Where | Verdict | Why |
+|---|---|---|---|
+| `react-refresh/only-export-components` | `context/UserContext.tsx`, `context/ThemeContext.tsx` | **I was lazy, Angela pushed back** | Initially I kept the Provider component and the consumer hook in one file because the disable comment was 1 line and refactoring was 3 files. After review I split each context: Provider stays in `*Context.tsx`, consumer hook lives in `useCurrentUser.ts` / `useTheme.ts`. No suppressions needed now. |
+| `react-hooks/set-state-in-effect` | All four read hooks (`usePost`, `usePosts`, `useUser`, `useUsers`) | **I insisted, comment-suppressed** | The rule rejects any synchronous `setState` inside `useEffect`. The canonical hand-rolled fetch pattern requires flipping `loading: true` at the start of every fetch so the spinner reappears on refetch. The only ways to fully satisfy the rule are TanStack Query / SWR (would replace these hooks entirely) or Suspense (experimental for client-side data fetching). For a learning assignment whose explicit goal is hand-rolling fetch state, the suppression is the right call. Each disable has a comment explaining the tradeoff; the long-form rationale lives in `usePosts.ts`. |
 
 ## Concepts I picked up along the way
 

@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCurrentUser } from '../context/UserContext'
+import { useCurrentUser } from '../context/useCurrentUser'
 import { createUser } from '../api/posts'
 import { api, ApiError } from '../api/client'
 
@@ -69,15 +69,11 @@ export default function SignInPage() {
 
   return (
     <div className="space-y-12">
-      <h1 className="font-serif text-3xl">Sign in</h1>
+      <h1 className="font-serif text-4xl font-bold">Sign in</h1>
 
       {/* Switch to existing user */}
       <form onSubmit={handleSignIn} className="space-y-3">
         <h2 className="font-serif text-xl">Sign in as existing user</h2>
-        <p className="text-sm text-muted">
-          X-Username isn't real auth — but I check that the username exists so you
-          don't discover the typo on your first post.
-        </p>
         <label htmlFor="signin-username" className="block">
           <span className="text-sm">Username</span>
           <input

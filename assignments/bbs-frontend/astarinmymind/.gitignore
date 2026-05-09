@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Playwright
+test-results
+playwright-report
+
+# Local notes (not for submission)
+DESIGN.md
+PLAN.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -8,6 +8,7 @@ import { PostCard } from '../components/PostCard'
 import { Spinner } from '../components/Spinner'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { ApiError } from '../api/client'
+import { formatDate } from '../lib/format'
 
 export default function UserProfilePage() {
   const { username = '' } = useParams()
@@ -19,9 +20,9 @@ export default function UserProfilePage() {
   if (error instanceof ApiError && error.status === 404) {
     return (
       <div className="text-center py-12 space-y-3">
-        <h1 className="font-serif text-3xl">User not found</h1>
+        <h1 className="font-serif text-4xl font-bold">User not found</h1>
         <p className="text-muted">No user "@{username}" exists.</p>
-        <Link to="/users" className="text-accent hover:underline">
+        <Link to="/users" className="underline underline-offset-2 decoration-muted/60 hover:text-accent hover:decoration-accent transition-colors">
           ← Back to all users
         </Link>
       </div>
@@ -37,10 +38,10 @@ export default function UserProfilePage() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="font-serif text-3xl">@{user.username}</h1>
+        <h1 className="font-serif text-4xl font-bold">@{user.username}</h1>
         {user.bio && <p className="text-text">{user.bio}</p>}
-        <p className="text-sm text-muted font-mono">
-          Joined {new Date(user.created_at).toLocaleDateString()}
+        <p className="text-sm text-muted">
+          Joined {formatDate(user.created_at)}
           {' · '}
           {user.post_count} {user.post_count === 1 ? 'post' : 'posts'}
         </p>

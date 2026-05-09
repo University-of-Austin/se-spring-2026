@@ -1,5 +1,6 @@
 // Clickable @username that goes to /users/:username.
-// Used wherever a username appears in the UI.
+// Kepano-style inline content link: underlined by default with a muted
+// underline; hover flips text + underline to the accent (turquoise).
 
 import { Link } from 'react-router-dom'
 
@@ -13,7 +14,7 @@ export function UserLink({
   return (
     <Link
       to={`/users/${username}`}
-      className={`text-accent hover:underline ${className}`}
+      className={`underline underline-offset-2 decoration-muted/60 hover:text-accent hover:decoration-accent transition-colors ${className}`}
     >
       @{username}
     </Link>
