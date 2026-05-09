@@ -128,4 +128,3 @@ timers:        |  |  |  |
 Without it, typing "haiku" = 5 fetches (`?q=h`, `?q=ha`, …). With it, 1 fetch for `?q=haiku`. Saves backend load AND avoids race conditions where the `?q=h` response could arrive after the `?q=haiku` response and overwrite it.
 
 Threshold: 300ms is the common default. Google uses ~150ms; sluggish forms 500ms+.
-- Agent suggested a single `api/client.ts` wrapper around `fetch` so base URL, `X-Username` header, and error handling live in one place instead of being repeated at every call site.
