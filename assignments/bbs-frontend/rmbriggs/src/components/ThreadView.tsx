@@ -58,6 +58,7 @@ function PostNode({
       {showReply && (
         <ComposeBox
           buttonLabel="Reply"
+          labelText={`Reply to ${node.username}`}
           placeholder="Write a reply…"
           onSubmit={async (m) => {
             await onReply(m, node.id);

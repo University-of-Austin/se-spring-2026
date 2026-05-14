@@ -162,6 +162,7 @@ export default function PostCard({ post, pending = false }: Props) {
         <div className="overflow-hidden">
           <ComposeBox
             buttonLabel="Reply"
+            labelText={`Reply to ${post.username}`}
             placeholder={`Reply to @${post.username}…`}
             onSubmit={onReply}
           />

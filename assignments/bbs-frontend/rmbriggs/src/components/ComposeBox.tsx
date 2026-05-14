@@ -1,15 +1,22 @@
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useId, useState } from "react";
 import { type ApiError, formatDetail } from "@/api/types";
 
 type Props = {
   onSubmit: (message: string) => Promise<void>;
   placeholder?: string;
   buttonLabel?: string;
+  labelText?: string;
 };
 
 const MAX = 500;
 
-export default function ComposeBox({ onSubmit, placeholder = "What's on your mind?", buttonLabel = "Post" }: Props) {
+export default function ComposeBox({
+  onSubmit,
+  placeholder = "What's on your mind?",
+  buttonLabel = "Post",
+  labelText = "Message",
+}: Props) {
+  const fieldId = useId();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +53,9 @@ export default function ComposeBox({ onSubmit, placeholder = "What's on your min
 
   return (
     <form onSubmit={onFormSubmit} className="border border-border rounded-lg bg-card p-3 space-y-2">
-      <label htmlFor="compose-message" className="sr-only">Message</label>
+      <label htmlFor={fieldId} className="sr-only">{labelText}</label>
       <textarea
-        id="compose-message"
+        id={fieldId}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
