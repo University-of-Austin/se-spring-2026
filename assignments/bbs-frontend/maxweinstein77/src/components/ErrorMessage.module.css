@@ -1,0 +1,29 @@
+.error {
+  padding: 1rem;
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg);
+  border-radius: 6px;
+  color: var(--color-danger-fg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.text {
+  margin: 0;
+}
+
+.retry {
+  align-self: flex-start;
+  padding: 0.25rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger-fg);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.retry:hover {
+  background: var(--color-danger-border);
+}
