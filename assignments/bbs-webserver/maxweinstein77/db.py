@@ -218,3 +218,13 @@ def delete_reaction(post_id: int, username: str) -> bool:
             {"p": post_id, "u": username},
         )
     return result.rowcount > 0
+
+def list_reactions_by_post(post_id: int) -> list[dict]:
+    # Fetch every reaction on a single post. Used by the A4 frontend so
+    # each post row can render a heart button + count.
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT post_id, username, kind FROM reactions WHERE post_id = :p"),
+            {"p": post_id},
+        ).mappings().all()
+    return [dict(r) for r in rows]

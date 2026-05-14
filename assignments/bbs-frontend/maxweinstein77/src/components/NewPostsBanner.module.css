@@ -1,0 +1,32 @@
+.banner {
+  position: sticky;
+  top: 4rem;
+  z-index: 5;
+  width: 100%;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  animation: slideIn 0.2s ease-out;
+}
+
+.banner:hover {
+  background: var(--color-accent-hover);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

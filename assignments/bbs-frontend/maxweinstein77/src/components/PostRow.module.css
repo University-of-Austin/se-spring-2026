@@ -1,0 +1,95 @@
+.row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.avatarLink {
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  user-select: none;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.author {
+  font-weight: 600;
+  color: var(--color-fg);
+  text-decoration: none;
+}
+
+.author:hover {
+  text-decoration: underline;
+  color: var(--color-accent);
+}
+
+.time {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.time:hover {
+  color: var(--color-fg);
+}
+
+.message {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.deleteBtn {
+  font-size: 0.8rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  color: var(--color-danger-fg);
+  border-color: var(--color-danger-border);
+}
+
+.deleteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

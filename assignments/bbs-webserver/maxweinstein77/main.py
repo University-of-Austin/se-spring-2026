@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import db
@@ -8,6 +9,16 @@ db.init_db()
 
 # The FastAPI app itself. Every route below gets registered on this object.
 app = FastAPI()
+
+# CORS: the A4 frontend at localhost:5173 needs to call this API at localhost:8000.
+# Browsers block cross-origin requests by default; this middleware opts in.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Pydantic models
 # These are the shape checks for incoming request bodies. If a request
@@ -147,3 +158,11 @@ def delete_reaction(post_id: int, username: str):
     if not db.delete_reaction(post_id, username):
         raise HTTPException(404, "reaction not found")
     return Response(status_code=204)
+
+@app.get("/posts/{post_id}/reactions")
+def list_reactions(post_id: int):
+    # Returns every reaction on a post. Added for the A4 frontend so it
+    # can render a heart button + count on each post row.
+    if not db.get_post(post_id):
+        raise HTTPException(404, "post not found")
+    return db.list_reactions_by_post(post_id)
