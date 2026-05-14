@@ -9,7 +9,6 @@ import UserPage from "@/pages/UserPage";
 import PostPage from "@/pages/PostPage";
 import BoardsPage from "@/pages/BoardsPage";
 import BoardPage from "@/pages/BoardPage";
-import TrendingPage from "@/pages/TrendingPage";
 
 export default function App() {
   return (
@@ -24,7 +23,6 @@ export default function App() {
             <Route path="/posts/:id" element={<PostPage />} />
             <Route path="/boards" element={<BoardsPage />} />
             <Route path="/boards/:name" element={<BoardPage />} />
-            <Route path="/trending" element={<TrendingPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

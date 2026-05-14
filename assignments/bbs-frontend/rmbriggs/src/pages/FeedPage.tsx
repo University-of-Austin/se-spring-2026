@@ -7,12 +7,18 @@ import ErrorBox from "@/components/ErrorBox";
 import PostCard from "@/components/PostCard";
 import ComposeBox from "@/components/ComposeBox";
 
+type Sort = "newest" | "oldest" | "trending";
+
 export default function FeedPage() {
   const { username } = useCurrentUser();
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState<Sort>("newest");
   const searchRef = useRef<HTMLInputElement>(null);
-  const { posts, optimistic, loading, error, hasMore, loadMore, refetch, createPost } = useFeed(q ? { q } : undefined);
+  const { posts, optimistic, loading, error, hasMore, loadMore, refetch, createPost } = useFeed({
+    sort,
+    ...(q ? { q } : {}),
+  });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -27,7 +33,7 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <label htmlFor="search" className="sr-only">Search posts</label>
         <input
           id="search"
@@ -36,19 +42,33 @@ export default function FeedPage() {
           onChange={(e) => setQInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") setQ(qInput); }}
           placeholder="Search posts (press / to focus)"
-          className="flex-1 border border-input rounded px-3 py-2 text-sm"
+          className="flex-1 min-w-[200px] border border-input rounded px-3 py-2 text-sm bg-background"
         />
         <button
           onClick={() => setQ(qInput)}
-          className="border border-input rounded px-3 py-2 text-sm hover:bg-accent"
+          className="border border-input rounded px-3 py-2 text-sm hover:bg-accent transition-colors"
         >
           Search
         </button>
         {q && (
-          <button onClick={() => { setQ(""); setQInput(""); }} className="text-sm underline text-muted-foreground">
+          <button
+            onClick={() => { setQ(""); setQInput(""); }}
+            className="text-sm underline text-muted-foreground"
+          >
             Clear
           </button>
         )}
+        <label htmlFor="sort" className="sr-only">Sort</label>
+        <select
+          id="sort"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className="border border-input rounded px-2 py-2 text-sm bg-background"
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="trending">Trending</option>
+        </select>
       </div>
 
       {username ? (
