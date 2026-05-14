@@ -193,11 +193,11 @@
     animation: bounceOnce 280ms ease;
   }
 
-  @keyframes slideInFromTop {
-    from { opacity: 0; transform: translateY(-12px); }
-    to { opacity: 1; transform: translateY(0); }
+  @keyframes optimisticFadeIn {
+    from { opacity: 0; }
+    to { opacity: 0.6; }
   }
-  .anim-slide-in-top {
-    animation: slideInFromTop 240ms ease both;
+  .anim-optimistic-in {
+    animation: optimisticFadeIn 120ms ease both;
   }
 }

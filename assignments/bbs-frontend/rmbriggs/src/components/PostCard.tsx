@@ -63,7 +63,7 @@ export default function PostCard({ post, pending = false }: Props) {
 
   return (
     <article
-      className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "opacity-60 anim-slide-in-top" : ""}`}
+      className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "anim-optimistic-in" : ""}`}
     >
       <header className="flex items-center gap-2 text-sm text-muted-foreground">
         <UserPill username={post.username} />
