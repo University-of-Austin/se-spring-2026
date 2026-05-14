@@ -198,14 +198,34 @@ def update_user_bio(username: str, bio: str) -> Optional[dict]:
 
 
 def delete_user(username: str) -> bool:
-    """Soft-delete a user by setting deleted_at. Returns True if a user was marked."""
+    """Soft-delete a user: free their username for re-registration while preserving
+    their posts with a `[deleted]` author substitution.
+
+    Renames the user row to `[deleted_<id>]` — brackets so it can't collide with
+    a real username (the create_user regex disallows them). Also drops the user's
+    reactions, since reactions are keyed by username string and would otherwise
+    silently carry over to whoever next registers the freed name.
+
+    Returns True if a user was marked.
+    """
     ts = _now()
     with engine.begin() as conn:
-        result = conn.execute(
-            text("UPDATE users SET deleted_at = :ts WHERE username = :u AND deleted_at IS NULL"),
-            {"ts": ts, "u": username},
+        user_row = conn.execute(
+            text("SELECT id FROM users WHERE username = :u AND deleted_at IS NULL"),
+            {"u": username},
+        ).fetchone()
+        if user_row is None:
+            return False
+        user_id = user_row.id
+        conn.execute(
+            text("DELETE FROM reactions WHERE username = :u"),
+            {"u": username},
         )
-    return result.rowcount > 0
+        conn.execute(
+            text("UPDATE users SET deleted_at = :ts, username = :new_name WHERE id = :id"),
+            {"ts": ts, "new_name": f"[deleted_{user_id}]", "id": user_id},
+        )
+    return True
 
 
 # ── Posts ──────────────────────────────────────────────────────────

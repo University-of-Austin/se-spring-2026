@@ -34,10 +34,11 @@ Default is `http://localhost:8000`.
 
 ## Changes I made to my A2 backend
 
-Two changes:
-
 1. **CORS middleware** allowing `http://localhost:5173`, because browsers refuse cross-origin requests unless the server opts in. One-liner per the FastAPI CORS docs.
-2. **`GET /posts/stream` SSE endpoint** for the real-time gold pick. Module-level subscriber registry (set of `(asyncio.Queue, optional_board_filter)` tuples). `POST /posts` now calls `_notify_post_subscribers(board)` after a successful insert, fanning out `"tick"` to every matching queue. The stream endpoint yields `data: tick\n\n` per message and `: heartbeat\n\n` every 15s of idle so proxies don't close it. Known limit: subscribers are per-process, so this would not survive `uvicorn --workers N` without a real broker (Redis pubsub or similar).
+2. **`GET /posts/stream` SSE endpoint** for the real-time gold pick. Module-level subscriber registry (set of `(asyncio.Queue, optional_board_filter)` tuples). The stream endpoint yields `data: tick\n\n` per message and `: heartbeat\n\n` every 15s of idle so proxies don't close it. Known limit: subscribers are per-process, so this would not survive `uvicorn --workers N` without a real broker (Redis pubsub or similar).
+3. **SSE ticks on every mutation that affects what's visible**, not just `POST /posts`. The endpoints `POST/DELETE /posts/{id}/reactions/*`, `PATCH /posts/{id}`, and `DELETE /posts/{id}` all now call the notifier with the affected post's board so other tabs refetch within a frame. Without this, reactions and edits only propagated on the next unrelated post.
+4. **`sort=newest|oldest|trending` on `GET /posts`**. Default is now `newest` (`ORDER BY p.id DESC`, cursor compares `<`), fixing a mismatch where the A2 docs said newest-first but the implementation was actually oldest-first. `trending` reuses the A1 time-decayed reply score `replies / (hours + 2)^1.2` (see `cmd_trending` in `assignments/bbs/rmbriggs/bbs_db.py`).
+5. **Soft-deleted usernames are recyclable.** `delete_user` now renames the soft-deleted user to `[deleted_<id>]` (brackets keep it out of the create-user regex's `^[a-zA-Z0-9_]+$`) and drops the user's reactions, so a future user registering the freed name doesn't silently inherit them. The A2 README's original "names aren't recycled" reasoning was about impersonation in old conversations — that's still handled because posts JOIN on `user_id`, and the `CASE WHEN u.deleted_at IS NOT NULL THEN '[deleted]'` substitution keeps old posts attributed to `[deleted]` even after the name is reclaimed by a different user.
 
 ## Design decisions
 
