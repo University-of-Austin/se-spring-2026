@@ -48,6 +48,20 @@ def _notify_post_subscribers(board: Optional[str]) -> None:
                 pass  # slow subscriber — drop this tick
 
 
+def _notify_for_post(post_id: int) -> None:
+    """Look up the post's board and notify subscribers matching that filter.
+
+    Called when a reaction, edit, or delete happens — the affected post is
+    already known; we just need its board to route the tick to the right
+    set of subscribers (None-filtered receives everything; board-filtered
+    receives only matches).
+    """
+    post = get_post(post_id)
+    if post is None:
+        return
+    _notify_post_subscribers(post.get("board"))
+
+
 # ── User endpoints ────────────────────────────────────────────────
 
 @app.post("/users", status_code=201)
@@ -195,7 +209,9 @@ def patch_post(post_id: int, body: UpdateMessage, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if post["username"] != x_username:
         raise HTTPException(status_code=403, detail="You can only edit your own posts")
-    return update_post_message(post_id, body.message)
+    result = update_post_message(post_id, body.message)
+    _notify_for_post(post_id)
+    return result
 
 
 @app.delete("/posts/{post_id}", status_code=204)
@@ -211,8 +227,10 @@ def delete_single_post(post_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if post["username"] != x_username:
         raise HTTPException(status_code=403, detail="You can only delete your own posts")
+    board = post.get("board")
     if not delete_post(post_id):
         raise HTTPException(status_code=404, detail="Post not found")
+    _notify_post_subscribers(board)
     return Response(status_code=204)
 
 
@@ -273,6 +291,7 @@ def post_reaction(post_id: int, body: CreateReaction, request: Request):
     result = create_reaction(post_id, x_username, body.kind)
     if result.get("_error") == "post_not_found":
         raise HTTPException(status_code=404, detail="Post not found")
+    _notify_for_post(post_id)
     return result
 
 
@@ -299,4 +318,5 @@ def delete_user_reaction(post_id: int, username: str, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if not result:
         raise HTTPException(status_code=404, detail="No reactions found for this user on this post")
+    _notify_for_post(post_id)
     return Response(status_code=204)
