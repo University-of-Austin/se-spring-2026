@@ -278,11 +278,15 @@ def get_posts(
     offset: int = 0,
     cursor: Optional[str] = None,
     include_replies: bool = False,
+    sort: Optional[str] = None,
 ) -> dict:
     """Returns {"posts": [...], "next_cursor": ..., "has_more": bool}.
 
     By default returns only top-level posts (parent_id IS NULL). Pass
     include_replies=True to return replies too.
+
+    sort="trending" ranks by total reaction count desc (tie-breaker created_at
+    desc, then id desc). Uses offset-based pagination; next_cursor is always None.
     """
     clauses = []
     params = {}  # type: Dict[str, object]
@@ -301,6 +305,38 @@ def get_posts(
         clauses.append("b.name = :board")
         params["board"] = board
 
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    # Trending: rank by reaction total, offset-based pagination.
+    if sort == "trending":
+        fetch_limit = limit + 1
+        params["limit"] = fetch_limit
+        params["offset"] = offset
+        sql = f"""
+            SELECT p.id,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN '[deleted]' ELSE u.username END AS username,
+                   p.message, p.created_at, p.updated_at, p.parent_id,
+                   b.name AS board_name
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN boards b ON p.board_id = b.id
+            LEFT JOIN (
+                SELECT post_id, COUNT(*) AS cnt FROM reactions GROUP BY post_id
+            ) r ON r.post_id = p.id
+            {where}
+            ORDER BY COALESCE(r.cnt, 0) DESC, p.created_at DESC, p.id DESC
+            LIMIT :limit OFFSET :offset
+        """
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+            post_ids = [r.id for r in rows[:limit]]
+            rc_map = _get_reaction_counts(conn, post_ids)
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        posts = [_post_dict(r, rc_map.get(r.id, {})) for r in rows]
+        return {"posts": posts, "next_cursor": None, "has_more": has_more}
+
+    # Default chronological path (unchanged from before): id-ordered, cursor or offset.
     cursor_id = None
     if cursor:
         try:

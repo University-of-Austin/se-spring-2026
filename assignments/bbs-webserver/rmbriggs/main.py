@@ -130,14 +130,15 @@ def list_posts(
     offset: int = Query(default=0, ge=0),
     cursor: Optional[str] = None,
     include_replies: bool = False,
+    sort: Optional[str] = None,
 ):
     result = get_posts(
         q=q, username=username, board=board,
         limit=limit, offset=offset, cursor=cursor,
-        include_replies=include_replies,
+        include_replies=include_replies, sort=sort,
     )
-    # If cursor was used, return envelope; otherwise return bare array for backwards compat
-    if cursor is not None:
+    # If cursor was used, or trending sort (envelope shape), return full envelope
+    if cursor is not None or sort == "trending":
         return result
     return result["posts"]
 
