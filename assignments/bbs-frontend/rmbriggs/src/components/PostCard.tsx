@@ -31,6 +31,7 @@ export default function PostCard({ post, pending = false }: Props) {
   const [myKind, setMyKind] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showReply, setShowReply] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   async function onReact(kind: Kind) {
     if (kind === myKind) return; // A2 POST is idempotent on same kind
@@ -66,6 +67,21 @@ export default function PostCard({ post, pending = false }: Props) {
     setShowReply(false);
   }
 
+  async function onDelete() {
+    setDeleted(true);
+    setError(null);
+    try {
+      await apiFetch(`/posts/${post.id}`, { method: "DELETE" });
+    } catch (e) {
+      setDeleted(false);
+      setError(`Couldn't delete: ${(e as ApiError).status}`);
+    }
+  }
+
+  if (deleted) return null;
+
+  const isOwner = !pending && username !== null && username === post.username;
+
   return (
     <article
       className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "anim-optimistic-in" : ""}`}
@@ -85,9 +101,17 @@ export default function PostCard({ post, pending = false }: Props) {
         {!pending && username && (
           <button
             onClick={() => setShowReply((v) => !v)}
-            className="ml-auto text-xs underline hover:text-foreground"
+            className={`text-xs underline hover:text-foreground ${isOwner ? "" : "ml-auto"}`}
           >
             {showReply ? "cancel" : "reply"}
+          </button>
+        )}
+        {isOwner && (
+          <button
+            onClick={onDelete}
+            className="ml-auto text-xs text-destructive underline hover:no-underline"
+          >
+            delete
           </button>
         )}
         {pending && (
