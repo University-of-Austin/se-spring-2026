@@ -15,7 +15,7 @@ export type FeedState = {
   createPost: (message: string, board?: string | null, parent_id?: number | null) => Promise<void>;
 };
 
-export function useFeed(params?: { q?: string; board?: string; username?: string }): FeedState {
+export function useFeed(params?: { q?: string; board?: string; username?: string; sort?: string }): FeedState {
   const [posts, setPosts] = useState<Post[]>([]);
   const [optimistic, setOptimistic] = useState<OptimisticPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,9 +32,10 @@ export function useFeed(params?: { q?: string; board?: string; username?: string
       if (params?.q) sp.set("q", params.q);
       if (params?.board) sp.set("board", params.board);
       if (params?.username) sp.set("username", params.username);
+      if (params?.sort) sp.set("sort", params.sort);
       return sp.toString();
     },
-    [params?.q, params?.board, params?.username],
+    [params?.q, params?.board, params?.username, params?.sort],
   );
 
   const fetchFirstPage = useCallback(async () => {

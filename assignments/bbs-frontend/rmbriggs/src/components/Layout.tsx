@@ -14,6 +14,7 @@ export default function Layout() {
           <Link to="/" className="text-lg font-semibold">BBS</Link>
           <nav className="flex gap-3 text-sm text-muted-foreground">
             <NavLink to="/" end className={({ isActive }) => (isActive ? "text-foreground" : "")}>Feed</NavLink>
+            <NavLink to="/trending" className={({ isActive }) => (isActive ? "text-foreground" : "")}>Trending</NavLink>
             <NavLink to="/users" className={({ isActive }) => (isActive ? "text-foreground" : "")}>Users</NavLink>
             <NavLink to="/boards" className={({ isActive }) => (isActive ? "text-foreground" : "")}>Boards</NavLink>
           </nav>
