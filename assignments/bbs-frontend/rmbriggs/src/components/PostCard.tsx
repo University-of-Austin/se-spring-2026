@@ -98,21 +98,25 @@ export default function PostCard({ post, pending = false }: Props) {
             </Link>
           </>
         )}
-        {!pending && username && (
-          <button
-            onClick={() => setShowReply((v) => !v)}
-            className={`text-xs underline hover:text-foreground ${isOwner ? "" : "ml-auto"}`}
-          >
-            {showReply ? "cancel" : "reply"}
-          </button>
-        )}
-        {isOwner && (
-          <button
-            onClick={onDelete}
-            className="ml-auto text-xs text-destructive underline hover:no-underline"
-          >
-            delete
-          </button>
+        {!pending && (username || isOwner) && (
+          <div className="ml-auto flex items-center gap-3">
+            {username && (
+              <button
+                onClick={() => setShowReply((v) => !v)}
+                className="text-xs underline hover:text-foreground"
+              >
+                {showReply ? "cancel" : "reply"}
+              </button>
+            )}
+            {isOwner && (
+              <button
+                onClick={onDelete}
+                className="text-xs text-destructive underline hover:no-underline"
+              >
+                delete
+              </button>
+            )}
+          </div>
         )}
         {pending && (
           <span className="ml-auto text-xs italic text-muted-foreground">
