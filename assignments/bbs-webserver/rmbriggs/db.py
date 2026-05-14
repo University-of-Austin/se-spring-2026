@@ -198,14 +198,34 @@ def update_user_bio(username: str, bio: str) -> Optional[dict]:
 
 
 def delete_user(username: str) -> bool:
-    """Soft-delete a user by setting deleted_at. Returns True if a user was marked."""
+    """Soft-delete a user: free their username for re-registration while preserving
+    their posts with a `[deleted]` author substitution.
+
+    Renames the user row to `[deleted_<id>]` — brackets so it can't collide with
+    a real username (the create_user regex disallows them). Also drops the user's
+    reactions, since reactions are keyed by username string and would otherwise
+    silently carry over to whoever next registers the freed name.
+
+    Returns True if a user was marked.
+    """
     ts = _now()
     with engine.begin() as conn:
-        result = conn.execute(
-            text("UPDATE users SET deleted_at = :ts WHERE username = :u AND deleted_at IS NULL"),
-            {"ts": ts, "u": username},
+        user_row = conn.execute(
+            text("SELECT id FROM users WHERE username = :u AND deleted_at IS NULL"),
+            {"u": username},
+        ).fetchone()
+        if user_row is None:
+            return False
+        user_id = user_row.id
+        conn.execute(
+            text("DELETE FROM reactions WHERE username = :u"),
+            {"u": username},
         )
-    return result.rowcount > 0
+        conn.execute(
+            text("UPDATE users SET deleted_at = :ts, username = :new_name WHERE id = :id"),
+            {"ts": ts, "new_name": f"[deleted_{user_id}]", "id": user_id},
+        )
+    return True
 
 
 # ── Posts ──────────────────────────────────────────────────────────
@@ -278,11 +298,22 @@ def get_posts(
     offset: int = 0,
     cursor: Optional[str] = None,
     include_replies: bool = False,
+    sort: Optional[str] = None,
 ) -> dict:
     """Returns {"posts": [...], "next_cursor": ..., "has_more": bool}.
 
     By default returns only top-level posts (parent_id IS NULL). Pass
     include_replies=True to return replies too.
+
+    sort selects ordering:
+      - "newest" (default): ORDER BY p.id DESC, cursor compares p.id < :cursor_id.
+      - "oldest": ORDER BY p.id ASC, cursor compares p.id > :cursor_id.
+      - "trending": time-decayed reply score
+            score = reply_count / (hours_since_post + 2)^1.2
+        +2 keeps brand-new zero-reply posts from dominating; the 1.2 exponent
+        decays older posts so they need disproportionately more replies to stay
+        ranked. Tie-break by created_at DESC, id DESC. Offset-based pagination
+        only; next_cursor is always None.
     """
     clauses = []
     params = {}  # type: Dict[str, object]
@@ -301,6 +332,46 @@ def get_posts(
         clauses.append("b.name = :board")
         params["board"] = board
 
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    # Trending: A1 time-decayed reply score, offset-based pagination.
+    if sort == "trending":
+        fetch_limit = limit + 1
+        params["limit"] = fetch_limit
+        params["offset"] = offset
+        sql = f"""
+            SELECT p.id,
+                   CASE WHEN u.deleted_at IS NOT NULL THEN '[deleted]' ELSE u.username END AS username,
+                   p.message, p.created_at, p.updated_at, p.parent_id,
+                   b.name AS board_name
+            FROM posts p
+            JOIN users u ON p.user_id = u.id
+            LEFT JOIN boards b ON p.board_id = b.id
+            LEFT JOIN (
+                SELECT parent_id, COUNT(*) AS cnt
+                FROM posts
+                WHERE parent_id IS NOT NULL
+                GROUP BY parent_id
+            ) r ON r.parent_id = p.id
+            {where}
+            ORDER BY CAST(COALESCE(r.cnt, 0) AS REAL)
+                     / pow((julianday('now') - julianday(p.created_at)) * 24 + 2, 1.2) DESC,
+                     p.created_at DESC, p.id DESC
+            LIMIT :limit OFFSET :offset
+        """
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+            post_ids = [r.id for r in rows[:limit]]
+            rc_map = _get_reaction_counts(conn, post_ids)
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        posts = [_post_dict(r, rc_map.get(r.id, {})) for r in rows]
+        return {"posts": posts, "next_cursor": None, "has_more": has_more}
+
+    # Chronological: newest (default) or oldest. Cursor or offset paginated.
+    direction = "DESC" if sort != "oldest" else "ASC"
+    cursor_op = "<" if sort != "oldest" else ">"
+
     cursor_id = None
     if cursor:
         try:
@@ -310,7 +381,7 @@ def get_posts(
             cursor_id = None
 
     if cursor_id is not None:
-        clauses.append("p.id > :cursor_id")
+        clauses.append(f"p.id {cursor_op} :cursor_id")
         params["cursor_id"] = cursor_id
     elif offset > 0:
         params["offset"] = offset
@@ -322,9 +393,9 @@ def get_posts(
     params["limit"] = fetch_limit
 
     if cursor_id is not None or offset == 0:
-        sql = f"{_POST_SELECT} {where} ORDER BY p.id LIMIT :limit"
+        sql = f"{_POST_SELECT} {where} ORDER BY p.id {direction} LIMIT :limit"
     else:
-        sql = f"{_POST_SELECT} {where} ORDER BY p.id LIMIT :limit OFFSET :offset"
+        sql = f"{_POST_SELECT} {where} ORDER BY p.id {direction} LIMIT :limit OFFSET :offset"
 
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).fetchall()
