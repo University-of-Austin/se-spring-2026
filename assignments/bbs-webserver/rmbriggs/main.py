@@ -1,7 +1,9 @@
+import asyncio
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from db import (
     init_db,
@@ -29,6 +31,21 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+# ── SSE pub/sub for new posts ─────────────────────────────────────
+
+_subscribers: set[tuple[asyncio.Queue, Optional[str]]] = set()
+
+
+def _notify_post_subscribers(board: Optional[str]) -> None:
+    """Fan out a tick to every SSE subscriber whose filter matches."""
+    for q, sub_filter in list(_subscribers):
+        if sub_filter is None or sub_filter == board:
+            try:
+                q.put_nowait("tick")
+            except asyncio.QueueFull:
+                pass  # slow subscriber — drop this tick
 
 
 # ── User endpoints ────────────────────────────────────────────────
@@ -100,6 +117,7 @@ def post_posts(body: CreatePost, request: Request):
         raise HTTPException(status_code=404, detail="Board not found")
     if isinstance(result, dict) and result.get("_error") == "parent_not_found":
         raise HTTPException(status_code=404, detail="Parent post not found")
+    _notify_post_subscribers(result.get("board"))
     return result
 
 
@@ -122,6 +140,29 @@ def list_posts(
     if cursor is not None:
         return result
     return result["posts"]
+
+
+# ── SSE stream ────────────────────────────────────────────────────
+
+@app.get("/posts/stream")
+async def stream_posts(board: Optional[str] = None):
+    q: asyncio.Queue = asyncio.Queue(maxsize=10)
+    sub = (q, board)
+    _subscribers.add(sub)
+
+    async def gen():
+        try:
+            yield ": connected\n\n"
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"data: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+        finally:
+            _subscribers.discard(sub)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/posts/{post_id}")
