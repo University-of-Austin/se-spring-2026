@@ -285,12 +285,15 @@ def get_posts(
     By default returns only top-level posts (parent_id IS NULL). Pass
     include_replies=True to return replies too.
 
-    sort="trending" ranks top-level posts by the A1 time-decayed reply score:
-    score = reply_count / (hours_since_post + 2)^1.2. The +2 offset keeps
-    brand-new zero-reply posts from dominating; the 1.2 exponent decays older
-    posts so they need disproportionately more replies to stay ranked. Tie-break
-    by created_at desc, then id desc. Uses offset-based pagination; next_cursor
-    is always None.
+    sort selects ordering:
+      - "newest" (default): ORDER BY p.id DESC, cursor compares p.id < :cursor_id.
+      - "oldest": ORDER BY p.id ASC, cursor compares p.id > :cursor_id.
+      - "trending": time-decayed reply score
+            score = reply_count / (hours_since_post + 2)^1.2
+        +2 keeps brand-new zero-reply posts from dominating; the 1.2 exponent
+        decays older posts so they need disproportionately more replies to stay
+        ranked. Tie-break by created_at DESC, id DESC. Offset-based pagination
+        only; next_cursor is always None.
     """
     clauses = []
     params = {}  # type: Dict[str, object]
@@ -345,7 +348,10 @@ def get_posts(
         posts = [_post_dict(r, rc_map.get(r.id, {})) for r in rows]
         return {"posts": posts, "next_cursor": None, "has_more": has_more}
 
-    # Default chronological path (unchanged from before): id-ordered, cursor or offset.
+    # Chronological: newest (default) or oldest. Cursor or offset paginated.
+    direction = "DESC" if sort != "oldest" else "ASC"
+    cursor_op = "<" if sort != "oldest" else ">"
+
     cursor_id = None
     if cursor:
         try:
@@ -355,7 +361,7 @@ def get_posts(
             cursor_id = None
 
     if cursor_id is not None:
-        clauses.append("p.id > :cursor_id")
+        clauses.append(f"p.id {cursor_op} :cursor_id")
         params["cursor_id"] = cursor_id
     elif offset > 0:
         params["offset"] = offset
@@ -367,9 +373,9 @@ def get_posts(
     params["limit"] = fetch_limit
 
     if cursor_id is not None or offset == 0:
-        sql = f"{_POST_SELECT} {where} ORDER BY p.id LIMIT :limit"
+        sql = f"{_POST_SELECT} {where} ORDER BY p.id {direction} LIMIT :limit"
     else:
-        sql = f"{_POST_SELECT} {where} ORDER BY p.id LIMIT :limit OFFSET :offset"
+        sql = f"{_POST_SELECT} {where} ORDER BY p.id {direction} LIMIT :limit OFFSET :offset"
 
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).fetchall()
