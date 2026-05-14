@@ -55,11 +55,16 @@ Two changes:
 
 ## Tests
 
+Two suites — unit/hook tests via Vitest, end-to-end flow via Playwright.
+
 ```bash
-npm test
+npm test          # Vitest: 27 tests across hooks/components/api
+npm run test:e2e  # Playwright: end-to-end user flow against a live backend + frontend
 ```
 
-Vitest + React Testing Library. 27 tests covering the most logic-heavy components (`ComposeBox`, `useFeed`, `ReactionBar`) plus foundation tests for `apiFetch`, `useApi`, `useCurrentUser`. Per repo convention, each test case is its own named function — no parametrize.
+The Vitest suite covers `apiFetch`, `useApi`, `useCurrentUser`, `useFeed` (including SSE), `ComposeBox`, and `ReactionBar` — 27 tests, named-function-per-case style.
+
+The Playwright suite at `tests/e2e/bbs.spec.ts` covers the gold-tier flow: create user → switch to that user → post a message → see it in the feed → delete it. It also asserts inline-422 surfacing on overlength messages and optimistic-then-reconciled reaction updates. The config auto-starts the FastAPI backend (`python3 -m uvicorn`) and the Vite dev server (`npm run dev`) if they aren't already running. First run needs `npx playwright install chromium` (~100MB Chromium download).
 
 ## Where my agent helped most and where I had to push back
 
