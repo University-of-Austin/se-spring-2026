@@ -9,7 +9,7 @@ export default function PostPage() {
   const navigate = useNavigate();
   const { thread, loading, error, refetch, deletePost, reply } = usePost(id);
 
-  if (error?.status === 404) return <p className="py-12 text-center text-neutral-500">Post not found.</p>;
+  if (error?.status === 404) return <p className="py-12 text-center text-muted-foreground">Post not found.</p>;
   if (loading) return <LoadingRow />;
   if (error) return <ErrorBox error={error} onRetry={refetch} />;
   if (!thread) return null;

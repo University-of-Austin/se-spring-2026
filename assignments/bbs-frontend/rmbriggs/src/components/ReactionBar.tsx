@@ -21,7 +21,7 @@ export default function ReactionBar({ counts, canReact, onReact }: Props) {
           aria-label={kind}
           disabled={!canReact}
           onClick={() => void onReact(kind)}
-          className="text-xs border border-neutral-200 rounded px-2 py-0.5 hover:bg-neutral-50 disabled:opacity-50"
+          className="text-xs border border-border rounded px-2 py-0.5 hover:bg-accent disabled:opacity-50"
         >
           <span aria-hidden className="mr-1">{emoji}</span>
           <span>{counts[kind] ?? 0}</span>

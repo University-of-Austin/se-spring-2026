@@ -45,7 +45,7 @@ export default function ComposeBox({ onSubmit, placeholder = "What's on your min
   }
 
   return (
-    <form onSubmit={onFormSubmit} className="border border-neutral-200 rounded-lg bg-white p-3 space-y-2">
+    <form onSubmit={onFormSubmit} className="border border-border rounded-lg bg-card p-3 space-y-2">
       <label htmlFor="compose-message" className="sr-only">Message</label>
       <textarea
         id="compose-message"
@@ -54,25 +54,25 @@ export default function ComposeBox({ onSubmit, placeholder = "What's on your min
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         rows={3}
-        className="w-full resize-y border-0 focus:ring-0 p-0 text-base placeholder-neutral-400"
+        className="w-full resize-y border-0 focus:ring-0 p-0 text-base placeholder:text-muted-foreground"
       />
       <div className="flex items-center gap-3">
         <span
           data-testid="char-count"
-          className={`text-xs ${len > MAX ? "text-red-600 font-medium" : "text-neutral-500"}`}
+          className={`text-xs ${len > MAX ? "text-destructive font-medium" : "text-muted-foreground"}`}
         >
           {len} / {MAX}
         </span>
         <button
           type="submit"
           disabled={!valid || busy}
-          className="ml-auto bg-neutral-900 text-white text-sm px-3 py-1.5 rounded disabled:opacity-50"
+          className="ml-auto bg-primary text-primary-foreground text-sm px-3 py-1.5 rounded disabled:opacity-50"
         >
           {busy ? "Posting…" : buttonLabel}
         </button>
       </div>
       {error && (
-        <div role="alert" className="text-sm text-red-700 border border-red-300 bg-red-50 px-2 py-1 rounded">
+        <div role="alert" className="text-sm text-destructive border border-destructive bg-destructive/10 px-2 py-1 rounded">
           {error}
         </div>
       )}

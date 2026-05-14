@@ -36,16 +36,16 @@ export default function FeedPage() {
           onChange={(e) => setQInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") setQ(qInput); }}
           placeholder="Search posts (press / to focus)"
-          className="flex-1 border border-neutral-300 rounded px-3 py-2 text-sm"
+          className="flex-1 border border-input rounded px-3 py-2 text-sm"
         />
         <button
           onClick={() => setQ(qInput)}
-          className="border border-neutral-300 rounded px-3 py-2 text-sm hover:bg-neutral-50"
+          className="border border-input rounded px-3 py-2 text-sm hover:bg-accent"
         >
           Search
         </button>
         {q && (
-          <button onClick={() => { setQ(""); setQInput(""); }} className="text-sm underline text-neutral-600">
+          <button onClick={() => { setQ(""); setQInput(""); }} className="text-sm underline text-muted-foreground">
             Clear
           </button>
         )}
@@ -54,7 +54,7 @@ export default function FeedPage() {
       {username ? (
         <ComposeBox onSubmit={(msg) => createPost(msg)} />
       ) : (
-        <div className="border border-neutral-200 rounded-lg bg-white p-3 text-sm text-neutral-600">
+        <div className="border border-border rounded-lg bg-card p-3 text-sm text-muted-foreground">
           <Link to="/login" className="underline">Sign in</Link> to post.
         </div>
       )}
@@ -67,11 +67,11 @@ export default function FeedPage() {
         <>
           {optimistic.map((p) => <PostCard key={`opt-${p.client_id}`} post={p} pending />)}
           {posts.length === 0 && optimistic.length === 0 && !error && (
-            <p className="py-12 text-center text-neutral-500">{q ? "No posts match." : "No posts yet."}</p>
+            <p className="py-12 text-center text-muted-foreground">{q ? "No posts match." : "No posts yet."}</p>
           )}
           {posts.map((p) => <PostCard key={p.id} post={p} />)}
           {hasMore && (
-            <button onClick={loadMore} className="w-full border border-neutral-200 rounded-lg bg-white py-2 text-sm hover:bg-neutral-50">
+            <button onClick={loadMore} className="w-full border border-border rounded-lg bg-card py-2 text-sm hover:bg-accent">
               Load more
             </button>
           )}

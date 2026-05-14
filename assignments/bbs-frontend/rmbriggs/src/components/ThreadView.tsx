@@ -34,8 +34,8 @@ function PostNode({
 
   return (
     <div style={{ marginLeft: indent }} className="space-y-2">
-      <article className="border border-neutral-200 rounded-lg bg-white px-4 py-3">
-        <header className="flex items-center gap-2 text-sm text-neutral-500">
+      <article className="border border-border rounded-lg bg-card px-4 py-3">
+        <header className="flex items-center gap-2 text-sm text-muted-foreground">
           <UserPill username={node.username} />
           <span aria-hidden>·</span>
           <span>{new Date(node.created_at).toLocaleString()}</span>
@@ -47,7 +47,7 @@ function PostNode({
           {username === node.username && (
             <button
               onClick={() => onDelete(node.id)}
-              className="text-xs text-red-700 underline"
+              className="text-xs text-destructive underline"
             >
               delete
             </button>
@@ -84,6 +84,6 @@ export default function ThreadView({
   onReply: (message: string, parentId: number) => Promise<void>;
 }) {
   const tree = useMemo(() => buildTree(posts, rootId), [posts, rootId]);
-  if (!tree) return <p className="text-neutral-500">Thread root not found.</p>;
+  if (!tree) return <p className="text-muted-foreground">Thread root not found.</p>;
   return <PostNode node={tree} depth={0} onDelete={onDelete} onReply={onReply} />;
 }

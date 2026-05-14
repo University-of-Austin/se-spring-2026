@@ -22,11 +22,11 @@ export default function BoardPage() {
         <>
           {optimistic.map((p) => <PostCard key={`opt-${p.client_id}`} post={p} pending />)}
           {posts.length === 0 && optimistic.length === 0 && !error && (
-            <p className="py-12 text-center text-neutral-500">No posts on this board yet.</p>
+            <p className="py-12 text-center text-muted-foreground">No posts on this board yet.</p>
           )}
           {posts.map((p) => <PostCard key={p.id} post={p} />)}
           {hasMore && (
-            <button onClick={loadMore} className="w-full border border-neutral-200 rounded-lg bg-white py-2 text-sm hover:bg-neutral-50">
+            <button onClick={loadMore} className="w-full border border-border rounded-lg bg-card py-2 text-sm hover:bg-accent">
               Load more
             </button>
           )}

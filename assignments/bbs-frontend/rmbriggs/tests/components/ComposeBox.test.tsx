@@ -19,7 +19,7 @@ describe("ComposeBox", () => {
     render(<ComposeBox onSubmit={vi.fn()} />);
     const ta = screen.getByLabelText(/message/i);
     fireEvent.change(ta, { target: { value: "x".repeat(501) } });
-    expect(screen.getByTestId("char-count")).toHaveClass("text-red-600");
+    expect(screen.getByTestId("char-count")).toHaveClass("text-destructive");
     expect(screen.getByRole("button", { name: /post/i })).toBeDisabled();
   });
 
