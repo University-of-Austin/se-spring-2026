@@ -285,8 +285,12 @@ def get_posts(
     By default returns only top-level posts (parent_id IS NULL). Pass
     include_replies=True to return replies too.
 
-    sort="trending" ranks by total reaction count desc (tie-breaker created_at
-    desc, then id desc). Uses offset-based pagination; next_cursor is always None.
+    sort="trending" ranks top-level posts by the A1 time-decayed reply score:
+    score = reply_count / (hours_since_post + 2)^1.2. The +2 offset keeps
+    brand-new zero-reply posts from dominating; the 1.2 exponent decays older
+    posts so they need disproportionately more replies to stay ranked. Tie-break
+    by created_at desc, then id desc. Uses offset-based pagination; next_cursor
+    is always None.
     """
     clauses = []
     params = {}  # type: Dict[str, object]
@@ -307,7 +311,7 @@ def get_posts(
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
-    # Trending: rank by reaction total, offset-based pagination.
+    # Trending: A1 time-decayed reply score, offset-based pagination.
     if sort == "trending":
         fetch_limit = limit + 1
         params["limit"] = fetch_limit
@@ -321,10 +325,15 @@ def get_posts(
             JOIN users u ON p.user_id = u.id
             LEFT JOIN boards b ON p.board_id = b.id
             LEFT JOIN (
-                SELECT post_id, COUNT(*) AS cnt FROM reactions GROUP BY post_id
-            ) r ON r.post_id = p.id
+                SELECT parent_id, COUNT(*) AS cnt
+                FROM posts
+                WHERE parent_id IS NOT NULL
+                GROUP BY parent_id
+            ) r ON r.parent_id = p.id
             {where}
-            ORDER BY COALESCE(r.cnt, 0) DESC, p.created_at DESC, p.id DESC
+            ORDER BY CAST(COALESCE(r.cnt, 0) AS REAL)
+                     / pow((julianday('now') - julianday(p.created_at)) * 24 + 2, 1.2) DESC,
+                     p.created_at DESC, p.id DESC
             LIMIT :limit OFFSET :offset
         """
         with engine.connect() as conn:
