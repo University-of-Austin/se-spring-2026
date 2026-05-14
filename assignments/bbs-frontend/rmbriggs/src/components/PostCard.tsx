@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "@/api/client";
 import type { Post, ApiError } from "@/api/types";
@@ -23,6 +23,11 @@ function fmtTime(iso: string): string {
 export default function PostCard({ post, pending = false }: Props) {
   const { username } = useCurrentUser();
   const [counts, setCounts] = useState(post.reaction_counts);
+
+  useEffect(() => {
+    setCounts(post.reaction_counts);
+  }, [post.reaction_counts]);
+
   const [myKind, setMyKind] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showReply, setShowReply] = useState(false);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/api/client";
+import { apiFetch, BASE } from "@/api/client";
 import type { ApiError, Post } from "@/api/types";
 
 export type ThreadResponse = { posts: Post[] };
@@ -25,6 +25,14 @@ export function usePost(idStr: string) {
 
   useEffect(() => {
     void refetch();
+  }, [refetch]);
+
+  useEffect(() => {
+    // Subscribe to the post stream and refetch the thread on each tick.
+    // Threads aren't board-scoped — reply boards are null — so subscribe unfiltered.
+    const es = new EventSource(`${BASE}/posts/stream`);
+    es.onmessage = () => void refetch();
+    return () => es.close();
   }, [refetch]);
 
   const deletePost = useCallback(
