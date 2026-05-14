@@ -13,8 +13,8 @@ const respond = (body: unknown, status = 200) =>
 
 describe("useFeed", () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("test_useFeed_starts_in_loading_state", () => {
@@ -53,18 +53,48 @@ describe("useFeed", () => {
     expect(fetchMock.mock.calls[1][0]).toContain("cursor=c1");
   });
 
-  it("test_useFeed_polls_every_3s_and_merges_new_posts", async () => {
+  it("test_useFeed_opens_event_stream_on_mount", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      respond({ posts: [], next_cursor: null, has_more: false }),
+    );
+    const constructed: string[] = [];
+    class FakeES {
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      constructor(public url: string) { constructed.push(url); }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeES);
+
+    const { result, unmount } = renderHook(() => useFeed());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(constructed.length).toBe(1);
+    expect(constructed[0]).toMatch(/\/posts\/stream$/);
+    unmount();
+  });
+
+  it("test_useFeed_refetches_when_event_stream_emits_message", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(respond({ posts: [mkPost(1)], next_cursor: null, has_more: false }))
       .mockResolvedValue(respond({ posts: [mkPost(2), mkPost(1)], next_cursor: null, has_more: false }));
 
+    let onMessage: ((e: MessageEvent) => void) | null = null;
+    class FakeES {
+      set onmessage(fn: (e: MessageEvent) => void) { onMessage = fn; }
+      close() {}
+      constructor(public url: string) {}
+    }
+    vi.stubGlobal("EventSource", FakeES);
+
     const { result } = renderHook(() => useFeed());
-    await waitFor(() => expect(result.current.posts.length).toBe(1));
+    await waitFor(() => expect(result.current.posts.map((p) => p.id)).toEqual([1]));
 
-    await act(async () => { await vi.advanceTimersByTimeAsync(3001); });
+    await act(async () => {
+      onMessage?.(new MessageEvent("message", { data: "tick" }));
+    });
 
+    await waitFor(() => expect(result.current.posts.map((p) => p.id)).toEqual([2, 1]));
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(result.current.posts.map((p) => p.id)).toEqual([2, 1]);
   });
 });

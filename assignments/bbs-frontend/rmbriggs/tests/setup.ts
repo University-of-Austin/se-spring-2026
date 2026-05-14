@@ -11,3 +11,20 @@ if (typeof jsdom !== "undefined" && jsdom.window?.localStorage) {
     get: () => jsdomStorage,
   });
 }
+
+// jsdom does not implement EventSource. Provide a no-op stub so tests that
+// don't exercise SSE behaviour don't throw "EventSource is not defined".
+// Individual tests override this with vi.stubGlobal("EventSource", FakeES).
+if (typeof globalThis.EventSource === "undefined") {
+  class NoopEventSource {
+    onmessage: ((e: MessageEvent) => void) | null = null;
+    onerror: ((e: Event) => void) | null = null;
+    constructor(public url: string) {}
+    close() {}
+  }
+  Object.defineProperty(globalThis, "EventSource", {
+    configurable: true,
+    writable: true,
+    value: NoopEventSource,
+  });
+}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/api/client";
+import { apiFetch, BASE } from "@/api/client";
 import type { ApiError, FeedPage, Post } from "@/api/types";
 
 export type OptimisticPost = Post & { client_id: string; status: "pending" | "failed" };
@@ -63,12 +63,12 @@ export function useFeed(params?: { q?: string; board?: string; username?: string
   }, [fetchFirstPage]);
 
   useEffect(() => {
-    const tick = () => {
-      if (document.visibilityState === "visible") void fetchFirstPage();
-    };
-    const id = window.setInterval(tick, 3000);
-    return () => window.clearInterval(id);
-  }, [fetchFirstPage]);
+    const url = new URL(`${BASE}/posts/stream`);
+    if (params?.board) url.searchParams.set("board", params.board);
+    const es = new EventSource(url.toString());
+    es.onmessage = () => void fetchFirstPage();
+    return () => es.close();
+  }, [fetchFirstPage, params?.board]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor) return;
