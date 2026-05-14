@@ -1,10 +1,11 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTheme } from "@/hooks/useTheme";
 
 export default function Layout() {
   const { username, clearUsername } = useCurrentUser();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggle } = useTheme();
 
   return (
@@ -47,7 +48,9 @@ export default function Layout() {
         </div>
       </header>
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-6">
-        <Outlet />
+        <div key={location.pathname} className="anim-page-in">
+          <Outlet />
+        </div>
       </main>
       <footer className="border-t border-border text-xs text-muted-foreground">
         <div className="max-w-3xl mx-auto px-4 py-2">

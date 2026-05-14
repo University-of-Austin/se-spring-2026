@@ -63,7 +63,7 @@ export default function PostCard({ post, pending = false }: Props) {
 
   return (
     <article
-      className={`border border-border rounded-lg bg-card px-4 py-3 ${pending ? "opacity-60" : ""}`}
+      className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "opacity-60 anim-slide-in-top" : ""}`}
     >
       <header className="flex items-center gap-2 text-sm text-muted-foreground">
         <UserPill username={post.username} />
@@ -113,15 +113,17 @@ export default function PostCard({ post, pending = false }: Props) {
         </div>
       )}
 
-      {showReply && (
-        <div className="mt-3">
+      <div
+        className={`grid mt-3 transition-[grid-template-rows] duration-200 ease-in-out ${showReply ? "grid-rows-[1fr]" : "grid-rows-[0fr] mt-0"}`}
+      >
+        <div className="overflow-hidden">
           <ComposeBox
             buttonLabel="Reply"
             placeholder={`Reply to @${post.username}…`}
             onSubmit={onReply}
           />
         </div>
-      )}
+      </div>
 
       {error && (
         <p role="alert" className="text-xs text-destructive mt-1">
