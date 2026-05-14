@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { MouseEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/api/client";
 import type { Post, ApiError } from "@/api/types";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -22,6 +22,7 @@ function fmtTime(iso: string): string {
 
 export default function PostCard({ post, pending = false }: Props) {
   const { username } = useCurrentUser();
+  const navigate = useNavigate();
   const [counts, setCounts] = useState(post.reaction_counts);
 
   useEffect(() => {
@@ -82,9 +83,16 @@ export default function PostCard({ post, pending = false }: Props) {
 
   const isOwner = !pending && username !== null && username === post.username;
 
+  function onCardClick(e: MouseEvent<HTMLElement>) {
+    if (pending) return;
+    if ((e.target as HTMLElement).closest("button, a, input, textarea")) return;
+    navigate(`/posts/${post.id}`);
+  }
+
   return (
     <article
-      className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "anim-optimistic-in" : ""}`}
+      onClick={onCardClick}
+      className={`border border-border rounded-lg bg-card px-4 py-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${pending ? "anim-optimistic-in" : "cursor-pointer"}`}
     >
       <header className="flex items-center gap-2 text-sm text-muted-foreground">
         <UserPill username={post.username} />
