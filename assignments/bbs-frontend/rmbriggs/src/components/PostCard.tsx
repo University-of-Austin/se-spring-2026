@@ -23,20 +23,32 @@ function fmtTime(iso: string): string {
 export default function PostCard({ post, pending = false }: Props) {
   const { username } = useCurrentUser();
   const [counts, setCounts] = useState(post.reaction_counts);
+  const [myKind, setMyKind] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showReply, setShowReply] = useState(false);
 
   async function onReact(kind: Kind) {
-    const prev = counts;
-    setCounts({ ...counts, [kind]: (counts[kind] ?? 0) + 1 });
+    if (kind === myKind) return; // A2 POST is idempotent on same kind
+    const prevCounts = counts;
+    const prevMyKind = myKind;
+    const next = { ...counts };
+    if (myKind) {
+      next[myKind] = Math.max(0, (next[myKind] ?? 0) - 1);
+    }
+    next[kind] = (next[kind] ?? 0) + 1;
+    setCounts(next);
+    setMyKind(kind);
     setError(null);
     try {
       await apiFetch(`/posts/${post.id}/reactions`, {
         method: "POST",
         body: JSON.stringify({ kind }),
       });
+      const updated = await apiFetch<Post>(`/posts/${post.id}`);
+      setCounts(updated.reaction_counts);
     } catch (e) {
-      setCounts(prev);
+      setCounts(prevCounts);
+      setMyKind(prevMyKind);
       setError(`Couldn't react: ${(e as ApiError).status}`);
     }
   }
