@@ -1,7 +1,7 @@
 import { MouseEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/api/client";
-import type { Post, ApiError } from "@/api/types";
+import { type ApiError, type Post, formatDetail } from "@/api/types";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import UserPill from "./UserPill";
 import ReactionBar from "./ReactionBar";
@@ -56,7 +56,8 @@ export default function PostCard({ post, pending = false }: Props) {
     } catch (e) {
       setCounts(prevCounts);
       setMyKind(prevMyKind);
-      setError(`Couldn't react: ${(e as ApiError).status}`);
+      const err = e as ApiError;
+      setError(`Couldn't react (${err.status}): ${formatDetail(err.detail)}`);
     }
   }
 
@@ -75,7 +76,8 @@ export default function PostCard({ post, pending = false }: Props) {
       await apiFetch(`/posts/${post.id}`, { method: "DELETE" });
     } catch (e) {
       setDeleted(false);
-      setError(`Couldn't delete: ${(e as ApiError).status}`);
+      const err = e as ApiError;
+      setError(`Couldn't delete (${err.status}): ${formatDetail(err.detail)}`);
     }
   }
 

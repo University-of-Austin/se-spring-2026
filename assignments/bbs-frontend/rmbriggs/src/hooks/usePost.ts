@@ -9,6 +9,7 @@ export function usePost(idStr: string) {
   const [thread, setThread] = useState<Post[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
+  const [actionError, setActionError] = useState<ApiError | null>(null);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -36,12 +37,21 @@ export function usePost(idStr: string) {
   }, [refetch]);
 
   const deletePost = useCallback(
-    async (targetId: number) => {
-      await apiFetch(`/posts/${targetId}`, { method: "DELETE" });
-      await refetch();
+    async (targetId: number): Promise<boolean> => {
+      setActionError(null);
+      try {
+        await apiFetch(`/posts/${targetId}`, { method: "DELETE" });
+        await refetch();
+        return true;
+      } catch (e) {
+        setActionError(e as ApiError);
+        return false;
+      }
     },
     [refetch],
   );
+
+  const dismissActionError = useCallback(() => setActionError(null), []);
 
   const reply = useCallback(
     async (message: string, parent_id: number) => {
@@ -51,5 +61,5 @@ export function usePost(idStr: string) {
     [refetch],
   );
 
-  return { thread, loading, error, refetch, deletePost, reply };
+  return { thread, loading, error, actionError, refetch, deletePost, reply, dismissActionError };
 }
