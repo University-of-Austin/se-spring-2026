@@ -29,7 +29,9 @@ export default function Layout() {
             {username ? (
               <span className="flex items-center gap-2">
                 <span className="text-muted-foreground">signed in as</span>
-                <span className="font-medium">{username}</span>
+                <Link to={`/users/${username}`} className="font-medium hover:underline">
+                  {username}
+                </Link>
                 <button
                   className="text-muted-foreground underline"
                   onClick={() => { clearUsername(); navigate("/login"); }}
