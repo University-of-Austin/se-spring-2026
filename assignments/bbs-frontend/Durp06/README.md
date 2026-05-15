@@ -175,7 +175,7 @@ they're easy to find:
   `loadMore`), which is set when a page response returns
   `length === limit`.
 - **Keyboard shortcuts beyond Ctrl+Enter.** Five of them, registered
-  in `src/components/AppShell.tsx:18-58`: `?` (help), `t` (theme),
+  in `src/components/AppShell.tsx:18-55`: `?` (help), `t` (theme),
   `n` (new post), `g f` (feed), `g u` (users). Surfaced in the help
   overlay (`src/components/HelpOverlay.tsx:8`, `SHORTCUTS` array)
   opened by `?` or the app-shell button.
