@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     css: false,
-    include: ['tests/**/*.test.{ts,tsx}'],
+    include: ['tests/components/**/*.test.{ts,tsx}'],
+    // Playwright specs live in tests/e2e and are run via `npm run test:e2e`.
+    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
   },
 })
