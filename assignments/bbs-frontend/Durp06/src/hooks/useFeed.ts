@@ -92,19 +92,25 @@ export function useFeed({
         offset: 0,
       });
       const pendingDeletes = pendingDeletesRef.current;
+      // `page.posts` only ever holds server-assigned (positive) ids; the
+      // pending-delete set is only populated with positive ids (FeedPage's
+      // handleDelete passes `post.id` which is positive for any row the
+      // server returned). Optimistic-create posts (negative ids) live in
+      // `current` and are spliced back below — they're untouched by this
+      // filter regardless of the pending-delete set's contents.
       const fresh = pendingDeletes.size === 0
         ? page.posts
         : page.posts.filter((p) => !pendingDeletes.has(p.id));
       setPosts((current) => {
-        // Optimistic-create posts (negative ids) live only on the client until
-        // the server response replaces them. Keep them at the head until then.
         const optimistic = current.filter((p) => p.id < 0);
         return [...optimistic, ...fresh];
       });
       setError(null);
     } catch {
-      // Swallow poll errors — initial-load failures surface via `error`;
-      // background poll failures shouldn't hijack the UI.
+      // Deliberate broad swallow — `listPosts` doesn't take a signal here so
+      // an AbortError can't occur; the only failures we'd see are network /
+      // server hiccups. Initial-load errors surface via `error`; background
+      // poll failures shouldn't hijack the UI with a toast storm.
     }
   }, []);
 

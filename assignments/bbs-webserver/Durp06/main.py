@@ -34,6 +34,10 @@ app = FastAPI(lifespan=lifespan)
 # A4 frontend lives at http://localhost:5173 (Vite default). Browser blocks
 # cross-origin reads by default; CORSMiddleware opts in for this single dev
 # origin. No credentials — X-Username is not real auth.
+#
+# Dev only — do not deploy as-is. A real deploy needs the production origin
+# in allow_origins (no wildcards alongside credentials) and real auth in
+# front of the write endpoints, not the X-Username placeholder.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

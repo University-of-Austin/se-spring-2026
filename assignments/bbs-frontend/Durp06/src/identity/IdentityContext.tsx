@@ -13,6 +13,8 @@ const IdentityCtx = createContext<IdentityValue | null>(null);
 export function IdentityProvider({ children }: { children: ReactNode }) {
   // Initialiser reads from localStorage synchronously so the first render
   // already reflects the persisted user — no "logged-out flash" on refresh.
+  // Assumes a browser environment (Vite SPA — no SSR). If SSR is ever added,
+  // gate this on `typeof window !== 'undefined'`.
   const [username, setUsernameState] = useState<string | null>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY);
