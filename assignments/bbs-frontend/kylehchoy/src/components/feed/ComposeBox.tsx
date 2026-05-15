@@ -1,8 +1,7 @@
 import { useState, useEffect, type FormEvent, type KeyboardEvent } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { createPost } from '../../api/posts'
 import { ApiError } from '../../api/types'
+import { useCreatePost } from '../../hooks/useCreatePost'
 import { useIdentity } from '../../auth/IdentityContext'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
@@ -20,25 +19,22 @@ import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
  */
 export function ComposeBox({ parentId }: { parentId?: number | null }) {
   const { username } = useIdentity()
-  const qc = useQueryClient()
   const [text, setText] = useState('')
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const mut = useMutation({
-    mutationFn: () => createPost({ message: text, parent_id: parentId ?? null }),
-    onSuccess: () => {
-      setText('')
-      setServerError(null)
-      qc.invalidateQueries({ queryKey: ['posts'] })
-      if (parentId != null) {
-        qc.invalidateQueries({ queryKey: ['post', parentId, 'replies'] })
-      }
-    },
-    onError: (err) => {
-      if (err instanceof ApiError) setServerError(err.message)
-      else setServerError(String(err))
-    },
-  })
+  const mut = useCreatePost()
+  const submit = () => {
+    setServerError(null)
+    mut.mutate(
+      { body: { message: text, parent_id: parentId ?? null } },
+      {
+        onSuccess: () => setText(''),
+        onError: (err) => {
+          setServerError(err instanceof ApiError ? err.message : String(err))
+        },
+      },
+    )
+  }
 
   // Clear stale server error when the user edits.
   useEffect(() => {
@@ -72,13 +68,13 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (disabled) return
-    mut.mutate()
+    submit()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !disabled) {
       e.preventDefault()
-      mut.mutate()
+      submit()
     }
   }
 

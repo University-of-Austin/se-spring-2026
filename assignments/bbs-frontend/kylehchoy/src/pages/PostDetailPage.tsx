@@ -5,6 +5,7 @@ import { getPost, deletePost } from '../api/posts'
 import { ApiError } from '../api/types'
 import { useIdentity } from '../auth/IdentityContext'
 import { LoadingRow, ErrorBanner } from '../components/states/States'
+import { ReactionBar } from '../components/reactions/ReactionBar'
 import { formatRelative } from '../lib/formatTime'
 
 /**
@@ -90,6 +91,8 @@ export default function PostDetailPage() {
               <p key={i} style={{ marginTop: i === 0 ? 0 : '0.6em' }}>{p}</p>
             ))}
           </div>
+
+          <ReactionBar post={post} />
 
           {isAuthor ? (
             <div style={{ marginTop: 24 }}>

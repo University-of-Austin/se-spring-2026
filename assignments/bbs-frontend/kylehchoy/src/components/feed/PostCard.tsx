@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Post } from '../../api/types'
 import { formatRelative } from '../../lib/formatTime'
+import { ReactionBar } from '../reactions/ReactionBar'
 
 /**
  * Single Wall post per the Variant C "Almanac" treatment.
@@ -10,15 +11,12 @@ import { formatRelative } from '../../lib/formatTime'
 export function PostCard({
   post,
   isFirst,
-  isOptimistic = false,
 }: {
   post: Post
   isFirst?: boolean
-  isOptimistic?: boolean
 }) {
-  const replyCount = post.snippet ? undefined : undefined
-  // ^ replyCount comes from a separate endpoint; show "N Notes" only when known.
-  // Keep eyebrow clean for now.
+  /** Negative IDs are optimistic temp posts (see useCreatePost). */
+  const isOptimistic = post.id < 0
 
   return (
     <article
@@ -42,12 +40,6 @@ export function PostCard({
         >
           @{post.username}
         </Link>
-        {replyCount !== undefined ? (
-          <>
-            <span style={dot}>·</span>
-            <span>{replyCount} notes</span>
-          </>
-        ) : null}
         {isOptimistic ? (
           <>
             <span style={dot}>·</span>
@@ -64,9 +56,11 @@ export function PostCard({
         )}
       </div>
 
+      {post.id > 0 ? <ReactionBar post={post} /> : null}
+
       <div style={footer}>
         <Link to={`/posts/${post.id}`} style={footerLink}>
-          Open thread
+          Open thread →
         </Link>
       </div>
     </article>
