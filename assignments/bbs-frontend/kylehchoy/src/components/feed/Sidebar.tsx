@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listUsers } from '../../api/users'
 import { useIdentity } from '../../auth/IdentityContext'
+import { TrendingWidget } from './TrendingWidget'
 
 /**
  * Right sidebar on the Feed page.
@@ -25,6 +26,8 @@ export function FeedSidebar() {
       <Section title="The Network">
         <Stat num={total} sub="students in the directory" />
       </Section>
+
+      <TrendingWidget window={24} />
 
       <Section title="Recently Joined">
         {recentlyOnline.length === 0 ? (

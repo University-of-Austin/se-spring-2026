@@ -16,6 +16,21 @@ export interface ListPostsParams {
   window?: number
 }
 
+export interface TrendingParams {
+  window?: number
+  limit?: number
+}
+
+/**
+ * Shortcut for ?sort=top with sensible defaults (24h window, 10 items).
+ * Equivalent to listPosts({ sort: 'top', window: 24, limit: 10 }) but
+ * with a clearer call site for the sidebar widget.
+ */
+export function getTrending(params: TrendingParams = {}): Promise<Post[]> {
+  const qs = buildQuery({ ...params } as Record<string, unknown>)
+  return apiFetch<Post[]>(`/posts/trending${qs}`)
+}
+
 export function listPosts(params: ListPostsParams = {}): Promise<ListPostsResponse> {
   const qs = buildQuery(params as Record<string, unknown>)
   return apiFetch<ListPostsResponse>(`/posts${qs}`)

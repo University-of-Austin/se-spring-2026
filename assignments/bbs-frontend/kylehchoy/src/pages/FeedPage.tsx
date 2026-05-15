@@ -10,10 +10,15 @@ import { PostCard } from '../components/feed/PostCard'
 import { FeedSidebar } from '../components/feed/Sidebar'
 import { LoadingRow, ErrorBanner, EmptyState } from '../components/states/States'
 
+type SortMode = 'recent' | 'top'
+type TopWindow = 24 | 168 | 720 // hours: 24h / 7d / 30d
+
 export default function FeedPage() {
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState<string | null>(null)
   const [accumulated, setAccumulated] = useState<Post[]>([])
+  const [sort, setSort] = useState<SortMode>('recent')
+  const [topWindow, setTopWindow] = useState<TopWindow>(24)
   const debouncedQuery = useDebouncedValue(query, 300)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
@@ -22,6 +27,13 @@ export default function FeedPage() {
     searchRef.current?.select()
   }, [])
   useKeyboardShortcut('/', focusSearch)
+
+  // Reset cursor when switching sort modes — A2 returns 422 on
+  // sort=top + cursor (bm25 rank isn't monotonic).
+  useEffect(() => {
+    setCursor(null)
+    setAccumulated([])
+  }, [sort, topWindow])
 
   // Reset accumulation when search changes (search uses offset, not cursor).
   const prevQ = useRef(debouncedQuery)
@@ -35,25 +47,32 @@ export default function FeedPage() {
 
   // Poll the top of the feed only — once the user has paged into older
   // posts (cursor != null), pause polling to avoid clobbering scroll.
+  // Sort=top also pauses polling because trending output is meant to
+  // be a snapshot, not a live stream.
   const refetchInterval = usePolling(5000)
-  const shouldPoll = cursor === null && !debouncedQuery
+  const shouldPoll = sort === 'recent' && cursor === null && !debouncedQuery
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<ListPostsResponse>({
-    queryKey: ['posts', { q: debouncedQuery, cursor }],
+    queryKey: ['posts', { q: debouncedQuery, cursor, sort, window: topWindow }],
     queryFn: () =>
       listPosts({
         q: debouncedQuery || undefined,
-        // A2 rejects cursor + q (422). Drop cursor when searching.
-        cursor: debouncedQuery ? undefined : cursor ?? undefined,
+        // A2 rejects cursor + q (422) and cursor + sort=top (422).
+        // Use offset path when searching or sorting by top.
+        cursor: debouncedQuery || sort === 'top' ? undefined : cursor ?? undefined,
+        sort: sort === 'top' ? 'top' : undefined,
+        window: sort === 'top' ? topWindow : undefined,
         limit: 25,
       }),
     refetchInterval: shouldPoll ? refetchInterval : false,
     refetchIntervalInBackground: false,
   })
 
-  // Merge cursor-paginated pages into accumulated.
+  // Merge cursor-paginated pages into accumulated. Only for the
+  // recent/no-search path — search and trending return their own
+  // fresh list every fetch.
   useEffect(() => {
-    if (!data || debouncedQuery) return
+    if (!data || debouncedQuery || sort === 'top') return
     if (cursor === null) {
       setAccumulated(data.posts)
     } else {
@@ -64,14 +83,20 @@ export default function FeedPage() {
         return merged
       })
     }
-  }, [data, debouncedQuery, cursor])
+  }, [data, debouncedQuery, cursor, sort])
 
-  const displayed = debouncedQuery ? data?.posts ?? [] : accumulated
+  const displayed = debouncedQuery || sort === 'top' ? data?.posts ?? [] : accumulated
 
   return (
     <div style={wrap} data-shell="two-col">
       <main>
         <SearchBox value={query} onChange={setQuery} inputRef={searchRef} />
+        <SortBar
+          sort={sort}
+          onSortChange={setSort}
+          topWindow={topWindow}
+          onWindowChange={setTopWindow}
+        />
 
         <ComposeBox />
 
@@ -94,7 +119,7 @@ export default function FeedPage() {
           <PostCard key={p.id} post={p} isFirst={i === 0} />
         ))}
 
-        {!debouncedQuery && data?.next_cursor ? (
+        {!debouncedQuery && sort === 'recent' && data?.next_cursor ? (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <button
               type="button"
@@ -111,6 +136,78 @@ export default function FeedPage() {
       <FeedSidebar />
     </div>
   )
+}
+
+function SortBar({
+  sort,
+  onSortChange,
+  topWindow,
+  onWindowChange,
+}: {
+  sort: SortMode
+  onSortChange: (s: SortMode) => void
+  topWindow: TopWindow
+  onWindowChange: (w: TopWindow) => void
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 24,
+        alignItems: 'baseline',
+        marginBottom: 24,
+        paddingBottom: 12,
+        borderBottom: '1px solid var(--hairline)',
+        flexWrap: 'wrap',
+      }}
+    >
+      <span style={sortLabel}>Sort</span>
+      <button type="button" onClick={() => onSortChange('recent')} style={tab(sort === 'recent')} aria-pressed={sort === 'recent'}>
+        Recent
+      </button>
+      <button type="button" onClick={() => onSortChange('top')} style={tab(sort === 'top')} aria-pressed={sort === 'top'}>
+        Trending
+      </button>
+      {sort === 'top' ? (
+        <>
+          <span style={{ ...sortLabel, marginLeft: 'auto' }}>Window</span>
+          {([24, 168, 720] as const).map((w) => (
+            <button
+              key={w}
+              type="button"
+              onClick={() => onWindowChange(w as TopWindow)}
+              style={tab(topWindow === w, true)}
+              aria-pressed={topWindow === w}
+            >
+              {w === 24 ? '24h' : w === 168 ? '7d' : '30d'}
+            </button>
+          ))}
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+const sortLabel: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)',
+  fontSize: 10,
+  letterSpacing: '0.2em',
+  textTransform: 'uppercase',
+  color: 'var(--muted)',
+}
+function tab(active: boolean, small = false): React.CSSProperties {
+  return {
+    fontFamily: 'var(--font-sans)',
+    fontSize: small ? 9 : 11,
+    letterSpacing: '0.16em',
+    textTransform: 'uppercase',
+    color: active ? 'var(--black)' : 'var(--muted)',
+    background: 'transparent',
+    border: 0,
+    padding: '2px 0',
+    borderBottom: active ? '2px solid var(--gold)' : '2px solid transparent',
+    cursor: 'pointer',
+  }
 }
 
 function SearchBox({
