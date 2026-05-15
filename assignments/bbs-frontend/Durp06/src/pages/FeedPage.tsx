@@ -34,15 +34,19 @@ export default function FeedPage() {
     async (post: Post) => {
       const index = feed.posts.findIndex((p) => p.id === post.id);
       setDeletingId(post.id);
-      feed.removeById(post.id); // optimistic
+      // Mark BEFORE removing — if a poll races us, it shouldn't bring this id back.
+      feed.markPendingDelete(post.id);
+      feed.removeById(post.id);
       try {
         await deletePost(post.id);
       } catch (err) {
-        // Rollback on failure.
         feed.restore(post, index);
         const msg = err instanceof ApiError ? err.message : (err as Error).message;
         pushToast(`Couldn't delete post: ${msg}`, 'error');
       } finally {
+        // Clear in both success and failure — on failure the row is back, and
+        // on success the server's view no longer has it anyway.
+        feed.clearPendingDelete(post.id);
         setDeletingId(null);
       }
     },

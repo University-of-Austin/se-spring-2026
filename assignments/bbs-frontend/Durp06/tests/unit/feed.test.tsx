@@ -44,6 +44,12 @@ function renderFeed() {
   );
 }
 
+// Polling cadence is 5s; tests run far faster. To exercise the
+// "poll-races-the-delete" path we need to advance fake timers manually.
+function advancePolls(times = 1, intervalMs = 5000) {
+  for (let i = 0; i < times; i++) vi.advanceTimersByTime(intervalMs);
+}
+
 describe('FeedPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -84,5 +90,47 @@ describe('FeedPage', () => {
 
     expect(await screen.findByText('first')).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent(/server boom/i);
+  });
+
+  it('does not resurrect an optimistically-deleted post when a poll fires mid-delete', async () => {
+    // The exact bug the README claims is fixed: a poll completes between
+    // optimistic-remove and server-ack and merges the deleted post back in.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    const listSpy = vi.spyOn(bbs, 'listPosts').mockResolvedValue({ posts: POSTS, nextCursor: null });
+
+    // Hold the delete in flight indefinitely so polls can race it.
+    let resolveDelete: () => void = () => {};
+    const deletePromise = new Promise<void>((resolve) => {
+      resolveDelete = resolve;
+    });
+    vi.spyOn(bbs, 'deletePost').mockReturnValueOnce(deletePromise);
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderFeed();
+
+    expect(await screen.findByText('first')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /delete post 1/i }));
+
+    // Row is gone optimistically.
+    await waitFor(() => expect(screen.queryByText('first')).not.toBeInTheDocument());
+
+    // Fire a poll. Server still includes post 1 in its response. Without the
+    // pending-delete bookkeeping this would resurrect it.
+    listSpy.mockClear();
+    advancePolls(2);
+    await waitFor(() => expect(listSpy).toHaveBeenCalled());
+
+    // After the poll resolves the deleted post is still gone.
+    await waitFor(() => expect(screen.queryByText('first')).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
+    expect(screen.getByText('second')).toBeInTheDocument();
+
+    // Server eventually acks the delete; nothing changes for the user.
+    resolveDelete();
+    await waitFor(() => expect(screen.queryByText('first')).not.toBeInTheDocument());
+
+    vi.useRealTimers();
   });
 });

@@ -17,11 +17,14 @@ interface FeedState {
   loadMore: () => Promise<void>;
   loadingMore: boolean;
   refetch: () => Promise<void>;
-  // Local mutations (used by ComposePage optimistic create / FeedPage delete).
-  prepend: (post: Post) => void;
+  // Local mutations (used by FeedPage's optimistic delete).
   removeById: (id: number) => void;
-  replaceById: (id: number, post: Post) => void;
   restore: (post: Post, atIndex: number) => void;
+  // Optimistic-delete bookkeeping: while a delete is in flight, the consumer
+  // marks the id as "pending delete" so the next poll's response doesn't
+  // resurrect it. Cleared on either confirm or rollback.
+  markPendingDelete: (id: number) => void;
+  clearPendingDelete: (id: number) => void;
 }
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -41,8 +44,13 @@ export function useFeed({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs (not state) so reads inside pollOnce don't need re-rendering and the
+  // callback identity stays stable across renders.
   const argsRef = useRef({ q, username, pageSize });
   argsRef.current = { q, username, pageSize };
+  const pendingDeletesRef = useRef<Set<number>>(new Set());
+  const postsRef = useRef<Post[]>(posts);
+  postsRef.current = posts;
 
   const fetchInitial = useCallback(async () => {
     setLoading(true);
@@ -68,36 +76,35 @@ export function useFeed({
     await fetchInitial();
   }, [fetchInitial]);
 
-  // Polling fetch is a *separate* path from refetch — it doesn't flip
-  // `loading` (would re-show the spinner every 5s) and preserves any
-  // already-loaded "load more" pages by only refreshing the head of the feed
-  // when there are no extra pages loaded.
+  // Polling fetch — separate path from `refetch` so it doesn't flip `loading`
+  // (which would re-show the spinner every 5s). Refreshes whatever the user
+  // has currently loaded so paginated content stays continuous when new posts
+  // arrive at the head. Respects pending-delete ids so an optimistic delete
+  // in flight isn't resurrected by a poll that races it.
   const pollOnce = useCallback(async () => {
     try {
+      const currentCount = postsRef.current.filter((p) => p.id >= 0).length;
+      const limit = Math.max(argsRef.current.pageSize, currentCount);
       const page = await listPosts({
         q: argsRef.current.q,
         username: argsRef.current.username,
-        limit: argsRef.current.pageSize,
+        limit,
         offset: 0,
       });
+      const pendingDeletes = pendingDeletesRef.current;
+      const fresh = pendingDeletes.size === 0
+        ? page.posts
+        : page.posts.filter((p) => !pendingDeletes.has(p.id));
       setPosts((current) => {
-        // Preserve optimistic-create posts (negative ids) that haven't reconciled yet.
+        // Optimistic-create posts (negative ids) live only on the client until
+        // the server response replaces them. Keep them at the head until then.
         const optimistic = current.filter((p) => p.id < 0);
-        // If the user has paginated past the first page, splice the fresh head
-        // in while keeping their lower pages untouched.
-        const knownIds = new Set(page.posts.map((p) => p.id));
-        const olderPages = current.filter((p) => p.id >= 0 && !knownIds.has(p.id));
-        const olderBeyondFirstPage = olderPages.filter((p) => {
-          // Anything older than the *last* post in the fresh first page stays.
-          if (page.posts.length === 0) return true;
-          return p.id < page.posts[page.posts.length - 1].id;
-        });
-        return [...optimistic, ...page.posts, ...olderBeyondFirstPage];
+        return [...optimistic, ...fresh];
       });
       setError(null);
     } catch {
-      // Swallow poll errors — initial load surfaces them via `error`; background poll failures
-      // shouldn't hijack the UI.
+      // Swallow poll errors — initial-load failures surface via `error`;
+      // background poll failures shouldn't hijack the UI.
     }
   }, []);
 
@@ -111,7 +118,13 @@ export function useFeed({
         limit: argsRef.current.pageSize,
         offset: nextOffset,
       });
-      setPosts((current) => [...current, ...page.posts]);
+      // Offset pagination can return rows the user already has if new posts
+      // were inserted at the head between clicks — dedupe.
+      setPosts((current) => {
+        const known = new Set(current.map((p) => p.id));
+        const fresh = page.posts.filter((p) => !known.has(p.id));
+        return [...current, ...fresh];
+      });
       setNextOffset(page.nextCursor === null ? null : Number(page.nextCursor));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : (err as Error).message);
@@ -155,13 +168,8 @@ export function useFeed({
     };
   }, [pollMs, pollOnce, q, username, pageSize]);
 
-  const prepend = useCallback((post: Post) => setPosts((cur) => [post, ...cur]), []);
   const removeById = useCallback(
     (id: number) => setPosts((cur) => cur.filter((p) => p.id !== id)),
-    [],
-  );
-  const replaceById = useCallback(
-    (id: number, post: Post) => setPosts((cur) => cur.map((p) => (p.id === id ? post : p))),
     [],
   );
   const restore = useCallback((post: Post, atIndex: number) => {
@@ -172,6 +180,13 @@ export function useFeed({
     });
   }, []);
 
+  const markPendingDelete = useCallback((id: number) => {
+    pendingDeletesRef.current.add(id);
+  }, []);
+  const clearPendingDelete = useCallback((id: number) => {
+    pendingDeletesRef.current.delete(id);
+  }, []);
+
   return {
     posts,
     loading,
@@ -180,9 +195,9 @@ export function useFeed({
     loadMore,
     loadingMore,
     refetch,
-    prepend,
     removeById,
-    replaceById,
     restore,
+    markPendingDelete,
+    clearPendingDelete,
   };
 }
