@@ -1,7 +1,7 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/types'
-import { useCreatePost } from '../../hooks/useCreatePost'
+import { useCreatePost, newIdempotencyKey } from '../../hooks/useCreatePost'
 import { useIdentity } from '../../auth/IdentityContext'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
@@ -20,6 +20,7 @@ export function ReplyComposer({
   const [text, setText] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const mut = useCreatePost()
+  const idemKeyRef = useRef<string>(newIdempotencyKey())
 
   if (!username) {
     return (
@@ -38,10 +39,14 @@ export function ReplyComposer({
   const submit = () => {
     setErr(null)
     mut.mutate(
-      { body: { message: text, parent_id: parentId } },
+      {
+        body: { message: text, parent_id: parentId },
+        idempotencyKey: idemKeyRef.current,
+      },
       {
         onSuccess: () => {
           setText('')
+          idemKeyRef.current = newIdempotencyKey()
           onDone?.()
         },
         onError: (e) => setErr(e instanceof ApiError ? e.message : String(e)),

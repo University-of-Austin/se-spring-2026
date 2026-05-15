@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent, type KeyboardEvent } from 'react'
+import { useRef, useState, useEffect, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/types'
-import { useCreatePost } from '../../hooks/useCreatePost'
+import { useCreatePost, newIdempotencyKey } from '../../hooks/useCreatePost'
 import { useIdentity } from '../../auth/IdentityContext'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
@@ -23,12 +23,22 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
   const [serverError, setServerError] = useState<string | null>(null)
 
   const mut = useCreatePost()
+  // Idempotency key for the current compose-intent. Stays stable across
+  // retry attempts of the same composition; rotates after a successful
+  // post so the next compose gets a fresh key.
+  const idemKeyRef = useRef<string>(newIdempotencyKey())
   const submit = () => {
     setServerError(null)
     mut.mutate(
-      { body: { message: text, parent_id: parentId ?? null } },
       {
-        onSuccess: () => setText(''),
+        body: { message: text, parent_id: parentId ?? null },
+        idempotencyKey: idemKeyRef.current,
+      },
+      {
+        onSuccess: () => {
+          setText('')
+          idemKeyRef.current = newIdempotencyKey()
+        },
         onError: (err) => {
           setServerError(err instanceof ApiError ? err.message : String(err))
         },

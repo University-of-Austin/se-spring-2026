@@ -5,7 +5,9 @@ import { useIdentity } from '../auth/IdentityContext'
 
 interface Vars {
   body: CreatePostBody
-  idempotencyKey?: string
+  /** Required. Caller generates once per compose-intent so retries of the
+   *  same intent are exactly-once via A2's Idempotency-Key handling. */
+  idempotencyKey: string
 }
 
 interface RootCtx {
@@ -14,21 +16,44 @@ interface RootCtx {
 }
 
 /**
+ * RFC-4122 v4 if available; padded fallback otherwise.
+ * Exported so callers can pre-generate a key for the lifetime of a
+ * compose UI and reuse it across retries.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/**
  * Optimistic post-create mutation.
  *
- * onMutate:
- *   - Cancels any in-flight ['posts', ...] queries (so the optimistic
- *     write doesn't get clobbered by a late response).
- *   - Snapshots every ['posts', ...] cache shape and prepends a temp
- *     Post with id = -Date.now() (negative so it cannot collide with
- *     a real server id).
- *   - For replies (parent_id !== null), also touches ['post', parentId,
- *     'replies'] and ['post', parentId].
- * onError:
- *   - Restores every snapshotted query.
- * onSettled:
- *   - Invalidates ['posts'] and (if reply) ['post', parentId, ...] so
- *     the server's canonical version replaces the temp.
+ * Idempotency contract (Gold #1 of A2's reliability primitives):
+ *   The caller must pass `idempotencyKey` in vars. To make a single
+ *   compose-intent exactly-once across user retries, allocate the key
+ *   when the user begins composing and pass the same value on every
+ *   submit attempt until success. On success, generate a new key for
+ *   the next compose.
+ *
+ *   Same key + same body → A2 returns the original 201 row.
+ *   Same key + different body → A2 returns 422 with "Idempotency-Key
+ *   mismatch: body does not match original request" (surfaces inline
+ *   via ApiError.message).
+ *
+ * Optimistic cache moves:
+ *   - Cancels in-flight ['posts', ...] queries so a late server response
+ *     can't clobber the optimistic write.
+ *   - Snapshots every ['posts', ...] cache, prepends a temp Post with
+ *     id = -Date.now() (negative IDs cannot collide with server IDs;
+ *     PostCard renders id < 0 as dimmed + "posting…").
+ *   - Skips caches whose key carries a search term (we can't predict
+ *     whether the new message matches the FTS query).
+ *   - For replies (parent_id != null), also patches ['post', parentId,
+ *     'replies'].
+ * onError restores snapshots. onSettled invalidates so the server's
+ * canonical row replaces the temp.
  */
 export function useCreatePost() {
   const { username } = useIdentity()
@@ -53,15 +78,11 @@ export function useCreatePost() {
         reaction_counts: { like: 0, laugh: 0, heart: 0 },
       }
 
-      // Snapshot + write to every ['posts', ...] cache.
       const prevPages: Array<[unknown, ListPostsResponse | undefined]> = []
       const caches = qc.getQueriesData<ListPostsResponse>({ queryKey })
       for (const [key, value] of caches) {
         prevPages.push([key, value])
         if (!value) continue
-        // Only inject into the top-level feed (no filters). If a cached
-        // query has a search term, skip — we don't know if our message
-        // matches the FTS query.
         const k = key as unknown[]
         const params = (k[1] as { q?: string } | undefined) ?? {}
         if (params.q) continue
@@ -71,14 +92,11 @@ export function useCreatePost() {
         })
       }
 
-      // For replies, also prepend to the parent's replies cache.
       if (body.parent_id != null) {
         const replyKey = ['post', body.parent_id, 'replies']
         await qc.cancelQueries({ queryKey: replyKey })
         const prev = qc.getQueryData<Post[]>(replyKey)
-        if (prev) {
-          qc.setQueryData<Post[]>(replyKey, [...prev, temp])
-        }
+        if (prev) qc.setQueryData<Post[]>(replyKey, [...prev, temp])
       }
 
       return { prevPages, tempId }

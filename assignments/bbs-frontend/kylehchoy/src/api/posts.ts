@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, apiFetchWithMeta, type FetchResult } from './client'
 import type {
   ListPostsResponse,
   Post,
@@ -25,6 +25,28 @@ export function getPost(id: number): Promise<Post> {
   return apiFetch<Post>(`/posts/${id}`)
 }
 
+/**
+ * Conditional GET against A2's weak ETag on /posts/{id}.
+ * Pass the previously-seen ETag as ifNoneMatch; the server returns
+ * 304 with no body when the post is unchanged. Caller keeps its
+ * cached Post in that case.
+ *
+ * Caches ETags in a module-level Map so callers can use it as a
+ * stateless function — first call carries no If-None-Match, subsequent
+ * calls send the last-seen ETag automatically.
+ */
+const etagCache = new Map<number, string>()
+
+export async function getPostWithEtag(id: number): Promise<FetchResult<Post>> {
+  const ifNoneMatch = etagCache.get(id)
+  const result = await apiFetchWithMeta<Post>(`/posts/${id}`, {
+    ifNoneMatch,
+    allow304: true,
+  })
+  if (result.etag) etagCache.set(id, result.etag)
+  return result
+}
+
 export interface CreatePostBody {
   message: string
   parent_id?: number | null
@@ -32,6 +54,23 @@ export interface CreatePostBody {
 
 export function createPost(body: CreatePostBody, idempotencyKey?: string): Promise<Post> {
   return apiFetch<Post>('/posts', {
+    method: 'POST',
+    body,
+    requireAuth: true,
+    idempotencyKey,
+  })
+}
+
+/**
+ * Variant that surfaces Location + ETag from the 201 response.
+ * Currently used internally; exposed in case the UI wants to navigate
+ * to the created post via Location instead of guessing the path.
+ */
+export function createPostWithMeta(
+  body: CreatePostBody,
+  idempotencyKey?: string,
+): Promise<FetchResult<Post>> {
+  return apiFetchWithMeta<Post>('/posts', {
     method: 'POST',
     body,
     requireAuth: true,

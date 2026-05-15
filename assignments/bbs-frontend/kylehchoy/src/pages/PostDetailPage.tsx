@@ -1,7 +1,8 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPost, deletePost } from '../api/posts'
+import { getPostWithEtag, deletePost } from '../api/posts'
+import type { Post } from '../api/types'
 import { ApiError } from '../api/types'
 import { useIdentity } from '../auth/IdentityContext'
 import { LoadingRow, ErrorBanner } from '../components/states/States'
@@ -23,9 +24,28 @@ export default function PostDetailPage() {
   const { username } = useIdentity()
   const [confirming, setConfirming] = useState(false)
 
-  const postQ = useQuery({
+  /**
+   * Conditional GET via A2's weak ETag on /posts/{id}. The first call
+   * carries no If-None-Match; the second sends the previously-seen
+   * ETag. If the post is unchanged, A2 returns 304 (notModified=true)
+   * and we keep the cached Post — saves the JSON body over the wire.
+   *
+   * TanStack Query's structural sharing means even a successful 200
+   * with identical content won't trigger re-renders; the 304 just
+   * saves bandwidth (and a JSON parse).
+   */
+  const postQ = useQuery<Post>({
     queryKey: ['post', postId],
-    queryFn: () => getPost(postId),
+    queryFn: async () => {
+      const result = await getPostWithEtag(postId)
+      if (result.notModified) {
+        // Use cached data. Query will accept the previousData if we
+        // return it explicitly.
+        const cached = qc.getQueryData<Post>(['post', postId])
+        if (cached) return cached
+      }
+      return result.data
+    },
     retry: (n, err) => !(err instanceof ApiError && err.status === 404) && n < 1,
     enabled: Number.isFinite(postId),
   })

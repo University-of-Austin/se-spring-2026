@@ -32,6 +32,20 @@ export interface RequestOptions {
 }
 
 /**
+ * Variant that returns body + the response headers we care about
+ * (ETag for conditional GETs, Location for created resources).
+ * Used by getPostWithMeta() so the caller can cache the ETag for
+ * next-time If-None-Match.
+ */
+export interface FetchResult<T> {
+  data: T
+  etag: string | null
+  location: string | null
+  status: number
+  notModified: boolean
+}
+
+/**
  * Single fetch wrapper. All API calls go through here.
  *
  * - Joins path to VITE_API_BASE (defaults to http://localhost:8000).
@@ -143,6 +157,67 @@ function humanize(
   if (status === 403) return detail || 'Forbidden.'
   if (status === 409) return detail || 'Conflict — that name is taken.'
   return detail || `Request failed (${status}).`
+}
+
+/**
+ * Like apiFetch but also returns ETag, Location, status, and a
+ * notModified flag (true when allow304 is set and the server returned
+ * 304 Not Modified). Used by reads that benefit from caching (getPost)
+ * and writes whose Location header is useful (createPost / createUser).
+ */
+export async function apiFetchWithMeta<T = unknown>(
+  path: string,
+  opts: RequestOptions = {},
+): Promise<FetchResult<T>> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  }
+  if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (opts.requireAuth) {
+    if (!currentUsername) {
+      throw new ApiError(
+        401,
+        'No identity set',
+        'You need to set an identity before doing that. Open Switch User.',
+      )
+    }
+    headers['X-Username'] = currentUsername
+  } else if (currentUsername) {
+    headers['X-Username'] = currentUsername
+  }
+  if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey
+  if (opts.ifNoneMatch) headers['If-None-Match'] = opts.ifNoneMatch
+
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    })
+  } catch (err) {
+    throw new ApiError(0, String(err), 'Could not reach the backend.')
+  }
+
+  const etag = res.headers.get('ETag')
+  const location = res.headers.get('Location')
+
+  if (opts.allow304 && res.status === 304) {
+    return { data: null as T, etag, location, status: 304, notModified: true }
+  }
+
+  if (res.status === 204) {
+    return { data: undefined as T, etag, location, status: 204, notModified: false }
+  }
+
+  let payload: unknown = null
+  const ct = res.headers.get('content-type') ?? ''
+  if (ct.includes('application/json')) payload = await res.json().catch(() => null)
+  else if (!res.ok) payload = await res.text().catch(() => '')
+
+  if (!res.ok) throw toApiError(res.status, payload)
+
+  return { data: payload as T, etag, location, status: res.status, notModified: false }
 }
 
 export { API_BASE }
