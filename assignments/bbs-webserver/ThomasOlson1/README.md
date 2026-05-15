@@ -2,31 +2,39 @@
 
 ## Setup
 
-Python 3.10+ required. Install dependencies:
+Python 3.10+ required. Run everything from inside `assignments/bbs-webserver/ThomasOlson1/`.
+
+Create a virtual environment and install dependencies:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` contains `fastapi`, `uvicorn`, `httpx`, and `sqlalchemy`. 
+`requirements.txt` contains `fastapi`, `uvicorn`, `httpx`, and `sqlalchemy`. The `.venv/` folder is gitignored.
 
 ## Running
 
-Run all commands from inside `assignments/bbs-webserver/ThomasOlson1/`.
-
-Start the server:
+With the venv active:
 
 ```bash
 uvicorn main:app --port 8000
 ```
 
-In another terminal, run the conformance script:
+In another terminal (also with the venv active), run the conformance script:
 
 ```bash
 python verify_api.py
 ```
 
+If `uvicorn` is not found, the venv is not active. Run `source .venv/bin/activate` again.
+
 The verifier uses a random run id each time so usernames and board names will not collide across runs. That means the database does not need to be wiped between runs. If you want to start fresh anyway, stop the server, `rm bbs.db`, and restart.
+
+## CORS (added for A4)
+
+This server has FastAPI's `CORSMiddleware` enabled for `http://localhost:5173` so my A4 React frontend can talk to it. Browsers block cross-origin fetches without it. The middleware is in `main.py` right after `app = FastAPI(...)`. The A2 verifier still passes 129/129 with it in place.
 
 ## Tier
 
