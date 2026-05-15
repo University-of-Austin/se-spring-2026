@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  background: var(--cream);
+  color: var(--black);
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--gold);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Visible focus ring everywhere — never remove */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Gold-on-gold is invisible. Inside the masthead bar, use white. */
+header[data-shell="masthead"] :focus-visible {
+  outline-color: #ffffff;
+}
+
+header[data-shell="masthead"] {
+  min-width: 0;
+}
+
+[data-masthead="brand"],
+[data-masthead="nav"] {
+  min-width: 0;
+}
+
+[data-masthead="nav"] {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Skip link — visually hidden until focused, then jumps to main content. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  background: var(--black);
+  color: var(--white);
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  z-index: 300;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 8px;
+}
+
+/* Responsive: collapse two-column page layouts at narrow widths.
+   FeedPage and UserProfilePage use `display: grid` with two columns
+   of 580px + 200px; below 880px we drop the sidebar beneath content.
+   At 480px and below we further pull in page padding. */
+@media (max-width: 880px) {
+  [data-shell="two-col"] {
+    grid-template-columns: 1fr !important;
+    gap: 48px !important;
+    max-width: 580px !important;
+  }
+}
+@media (max-width: 480px) {
+  [data-shell="two-col"] {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  header[data-shell="masthead"] {
+    height: auto !important;
+    min-height: 40px;
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 6px 16px !important;
+  }
+
+  [data-masthead="brand"] {
+    flex: 1 1 140px;
+  }
+
+  [data-masthead="nav"] {
+    flex: 1 1 100%;
+    justify-content: flex-start !important;
+    gap: 6px 14px !important;
+    font-size: 10px !important;
+    line-height: 1.1;
+  }
+
+  [data-masthead="nav"] a,
+  [data-masthead="nav"] button {
+    font-size: 10px !important;
+  }
+}
+
+/* Shortcut overlay enter animation */
+@keyframes kbdFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
