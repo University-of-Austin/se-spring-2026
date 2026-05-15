@@ -1,7 +1,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getPostWithEtag, deletePost } from '../api/posts'
+import { getPostWithEtag, invalidatePostEtag, deletePost } from '../api/posts'
 import type { Post } from '../api/types'
 import { ApiError } from '../api/types'
 import { useIdentity } from '../auth/IdentityContext'
@@ -43,6 +43,13 @@ export default function PostDetailPage() {
         // return it explicitly.
         const cached = qc.getQueryData<Post>(['post', postId])
         if (cached) return cached
+        // 304 + no cache means our ETag is stale relative to Query's GC.
+        // Force a non-conditional fetch by clearing the stored ETag and
+        // re-asking. The retry won't send If-None-Match this time.
+        invalidatePostEtag(postId)
+        const fresh = await getPostWithEtag(postId)
+        if (fresh.data) return fresh.data
+        throw new ApiError(0, 'Empty response after 304', 'Failed to refetch post.')
       }
       return result.data
     },

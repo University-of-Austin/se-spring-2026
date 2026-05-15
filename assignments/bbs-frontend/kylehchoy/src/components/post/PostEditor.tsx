@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { patchPost } from '../../api/posts'
-import type { Post } from '../../api/types'
+import type { ListPostsResponse, Post } from '../../api/types'
 import { ApiError } from '../../api/types'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
@@ -25,7 +25,43 @@ export function PostEditor({
   const mut = useMutation({
     mutationFn: () => patchPost(post.id, text),
     onSuccess: (updated) => {
+      // Detail page cache.
       qc.setQueryData<Post>(['post', post.id], updated)
+
+      // Walk every Wall / profile / trending list cache and replace
+      // the matching post in place so the Wall shows the new body
+      // without waiting for the invalidate-refetch round-trip.
+      // Same idiom useToggleReaction uses for count updates.
+      const lists = qc.getQueriesData<ListPostsResponse>({ queryKey: ['posts'] })
+      for (const [key, value] of lists) {
+        if (!value) continue
+        const idx = value.posts.findIndex((p) => p.id === updated.id)
+        if (idx < 0) continue
+        const next = { ...value, posts: [...value.posts] }
+        next.posts[idx] = updated
+        qc.setQueryData(key as unknown[], next)
+      }
+
+      // Reply caches too — if the edited post is a reply, the parent's
+      // ['post', parent, 'replies'] cache holds it.
+      const replyCaches = qc.getQueriesData<Post[]>({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === 'post' &&
+          q.queryKey[2] === 'replies',
+      })
+      for (const [key, value] of replyCaches) {
+        if (!value) continue
+        const idx = value.findIndex((p) => p.id === updated.id)
+        if (idx < 0) continue
+        const next = [...value]
+        next[idx] = updated
+        qc.setQueryData(key as unknown[], next)
+      }
+
+      // Still invalidate so the server's canonical state lands on the
+      // next focus / poll cycle. Cheap insurance against caches the
+      // walk above didn't catch.
       qc.invalidateQueries({ queryKey: ['posts'] })
       onDone()
     },

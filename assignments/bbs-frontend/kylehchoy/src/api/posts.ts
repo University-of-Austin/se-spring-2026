@@ -52,6 +52,11 @@ export function getPost(id: number): Promise<Post> {
  */
 const etagCache = new Map<number, string>()
 
+/** Drop the cached ETag for a post; next fetch will be unconditional. */
+export function invalidatePostEtag(id: number): void {
+  etagCache.delete(id)
+}
+
 export async function getPostWithEtag(id: number): Promise<FetchResult<Post>> {
   const ifNoneMatch = etagCache.get(id)
   const result = await apiFetchWithMeta<Post>(`/posts/${id}`, {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getReactions } from '../../api/posts'
 import { REACTION_KINDS, type Post, type ReactionKind } from '../../api/types'
@@ -13,6 +14,9 @@ import { useIdentity } from '../../auth/IdentityContext'
 export function ReactionBar({ post }: { post: Post }) {
   const { username } = useIdentity()
   const toggle = useToggleReaction()
+  // Per-bar pending tracking. Only the kind being mutated disables —
+  // the other two stay clickable so the user can stack reactions.
+  const [pendingKind, setPendingKind] = useState<ReactionKind | null>(null)
 
   const viewerQ = useQuery({
     queryKey: ['post', post.id, 'reactions'],
@@ -28,12 +32,19 @@ export function ReactionBar({ post }: { post: Post }) {
       {REACTION_KINDS.map((kind) => {
         const reacted = viewerSet.has(kind)
         const count = post.reaction_counts[kind] ?? 0
+        const isPending = pendingKind === kind
         return (
           <button
             key={kind}
             type="button"
-            disabled={!username || toggle.isPending}
-            onClick={() => toggle.mutate({ postId: post.id, kind, reacted })}
+            disabled={!username || isPending}
+            onClick={() => {
+              setPendingKind(kind)
+              toggle.mutate(
+                { postId: post.id, kind, reacted },
+                { onSettled: () => setPendingKind(null) },
+              )
+            }}
             aria-pressed={reacted}
             aria-label={`${reacted ? 'Remove' : 'Add'} ${kind} reaction`}
             style={btn(reacted, !username)}

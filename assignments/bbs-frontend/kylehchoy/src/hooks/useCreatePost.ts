@@ -84,8 +84,19 @@ export function useCreatePost() {
         prevPages.push([key, value])
         if (!value) continue
         const k = key as unknown[]
-        const params = (k[1] as { q?: string } | undefined) ?? {}
+        const params =
+          (k[1] as { q?: string; sort?: string; username?: string } | undefined) ?? {}
+        // Skip caches where the optimistic post wouldn't actually belong:
+        //  - FTS searches: bm25 ranking is opaque, we can't know if the
+        //    new post matches the query without re-running it
+        //  - Trending: a brand-new post has zero reactions, so it can't
+        //    be on a popularity leaderboard
+        //  - Other-user profile pages: ?username=other filters out this
+        //    author, so injecting our temp post would briefly show on a
+        //    profile the post doesn't belong to
         if (params.q) continue
+        if (params.sort === 'top') continue
+        if (params.username && params.username !== username) continue
         qc.setQueryData<ListPostsResponse>(key as unknown[], {
           posts: [temp, ...value.posts],
           next_cursor: value.next_cursor,

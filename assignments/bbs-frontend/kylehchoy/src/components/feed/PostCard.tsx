@@ -57,11 +57,7 @@ export function PostCard({
       </div>
 
       <div style={body}>
-        {post.snippet ? (
-          <span dangerouslySetInnerHTML={{ __html: sanitizeSnippet(post.snippet) }} />
-        ) : (
-          renderBody(post.message)
-        )}
+        {post.snippet ? renderSnippet(post.snippet) : renderBody(post.message)}
       </div>
 
       {post.id > 0 ? <ReactionBar post={post} /> : null}
@@ -75,11 +71,36 @@ export function PostCard({
   )
 }
 
-/** Allow only <b>…</b> from FTS snippets; strip everything else. */
-function sanitizeSnippet(s: string): string {
-  return s
-    .replace(/<(?!\/?b\b)[^>]*>/gi, '')
-    .replace(/<b>/gi, '<b style="background: var(--gold-tint);">')
+/**
+ * Render an A2 FTS5 snippet WITHOUT dangerouslySetInnerHTML.
+ *
+ * A2's snippet() carries two layers of content: the user-controlled
+ * message body (which can contain literal angle brackets and HTML-like
+ * substrings) plus <b>...</b> markers around bm25-matched terms inserted
+ * by SQLite. The previous regex-strip approach was unsafe — the
+ * negative-lookahead `b\b` treated a space as a word boundary, so
+ * `<b onclick="alert(1)">` passed through and was rendered as raw HTML.
+ *
+ * Safer approach: split on the <b>...</b> markers, render text
+ * fragments as React text (which escapes < / > / & automatically),
+ * render bold fragments as <b> elements. No dangerouslySetInnerHTML
+ * anywhere on this path.
+ */
+function renderSnippet(s: string): React.ReactNode {
+  // Split keeps capturing groups, so we end up with alternating
+  // [plain, '<b>match</b>', plain, '<b>match</b>', plain].
+  const parts = s.split(/(<b>[\s\S]*?<\/b>)/gi)
+  return parts.map((part, i) => {
+    const m = part.match(/^<b>([\s\S]*?)<\/b>$/i)
+    if (m) {
+      return (
+        <b key={i} style={{ background: 'var(--gold-tint)' }}>
+          {m[1]}
+        </b>
+      )
+    }
+    return <span key={i}>{part}</span>
+  })
 }
 
 /** Break body into <p>s on blank lines so eyebrow / serif rhythm holds. */
