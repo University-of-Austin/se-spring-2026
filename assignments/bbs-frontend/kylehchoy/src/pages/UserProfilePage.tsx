@@ -51,7 +51,7 @@ export default function UserProfilePage() {
   }
 
   return (
-    <div style={wrap}>
+    <div style={wrap} data-shell="two-col">
       <main>
         {userQ.isLoading ? <LoadingRow label="Profile" /> : null}
         {userQ.isError && !(userQ.error instanceof ApiError && userQ.error.status === 404) ? (

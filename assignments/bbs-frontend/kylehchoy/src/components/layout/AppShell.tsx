@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { MastheadHeader } from './MastheadHeader'
 import { Tagline } from './Tagline'
 import { FooterThesis } from './FooterThesis'
+import { ShortcutOverlay } from './ShortcutOverlay'
 
 /**
  * Page shell. Header / tagline / outlet / footer.
@@ -15,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Tagline />
       <main>{children}</main>
       <FooterThesis />
+      <ShortcutOverlay />
     </>
   )
 }

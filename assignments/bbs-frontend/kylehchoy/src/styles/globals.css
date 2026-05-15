@@ -41,3 +41,27 @@ button {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+
+/* Responsive: collapse two-column page layouts at narrow widths.
+   FeedPage and UserProfilePage use `display: grid` with two columns
+   of 580px + 200px; below 880px we drop the sidebar beneath content.
+   At 480px and below we further pull in page padding. */
+@media (max-width: 880px) {
+  [data-shell="two-col"] {
+    grid-template-columns: 1fr !important;
+    gap: 48px !important;
+    max-width: 580px !important;
+  }
+}
+@media (max-width: 480px) {
+  [data-shell="two-col"] {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* Shortcut overlay enter animation */
+@keyframes kbdFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

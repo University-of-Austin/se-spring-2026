@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listPosts } from '../api/posts'
 import type { ListPostsResponse, Post } from '../api/types'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePolling } from '../hooks/usePolling'
+import { useKeyboardShortcut } from '../hooks/useKeyboardShortcut'
 import { ComposeBox } from '../components/feed/ComposeBox'
 import { PostCard } from '../components/feed/PostCard'
 import { FeedSidebar } from '../components/feed/Sidebar'
@@ -14,6 +15,13 @@ export default function FeedPage() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [accumulated, setAccumulated] = useState<Post[]>([])
   const debouncedQuery = useDebouncedValue(query, 300)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+
+  const focusSearch = useCallback(() => {
+    searchRef.current?.focus()
+    searchRef.current?.select()
+  }, [])
+  useKeyboardShortcut('/', focusSearch)
 
   // Reset accumulation when search changes (search uses offset, not cursor).
   const prevQ = useRef(debouncedQuery)
@@ -61,9 +69,9 @@ export default function FeedPage() {
   const displayed = debouncedQuery ? data?.posts ?? [] : accumulated
 
   return (
-    <div style={wrap}>
+    <div style={wrap} data-shell="two-col">
       <main>
-        <SearchBox value={query} onChange={setQuery} />
+        <SearchBox value={query} onChange={setQuery} inputRef={searchRef} />
 
         <ComposeBox />
 
@@ -105,7 +113,15 @@ export default function FeedPage() {
   )
 }
 
-function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function SearchBox({
+  value,
+  onChange,
+  inputRef,
+}: {
+  value: string
+  onChange: (v: string) => void
+  inputRef?: React.RefObject<HTMLInputElement | null>
+}) {
   return (
     <div style={{ marginBottom: 24 }}>
       <label
@@ -120,10 +136,11 @@ function SearchBox({ value, onChange }: { value: string; onChange: (v: string) =
           marginBottom: 8,
         }}
       >
-        Search the Directory
+        Search the Directory <span style={{ color: 'var(--hairline)' }}>· press /</span>
       </label>
       <input
         id="search-wall"
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
