@@ -41,7 +41,7 @@ $env:VITE_API_BASE = "http://localhost:8000"; npm run dev
 ### Tests (silver/gold)
 
 ```bash
-npm run test        # Vitest: 9 unit tests (compose / feed / identity)
+npm run test        # Vitest: 10 unit tests (compose / feed / identity)
 npm run test:e2e    # Playwright: full user flow against npm run dev + uvicorn
 ```
 
@@ -98,13 +98,18 @@ All eight A2 bronze endpoints are wired up.
    "switch existing user" without hitting the API, since users are
    identified by string only.
 
-4. **Optimistic delete (silver), with rollback.** Clicking delete in the
-   feed removes the row from the local list immediately, fires `DELETE
-   /posts/{id}`, and on failure restores the row at its original index and
-   pushes an error toast. Optimistic *create* is intentionally not done —
-   the compose page is its own route and the user expects to be navigated
-   back to the feed only after the server has acknowledged, so the latency
-   is already hidden by the route transition.
+4. **Optimistic delete (silver), with rollback and poll-race guard.**
+   Clicking delete in the feed removes the row from the local list
+   immediately, fires `DELETE /posts/{id}`, and on failure restores the
+   row at its original index and pushes an error toast. The hook also
+   tracks a `pendingDeletes` set so a 5-second poll firing between the
+   optimistic remove and the server's response can't merge the deleted
+   row back in (the regression test in `tests/unit/feed.test.tsx` drives
+   exactly that race with fake timers). Optimistic *create* is
+   intentionally not done — the compose page is its own route and the
+   user expects to be navigated back to the feed only after the server
+   has acknowledged, so the latency is already hidden by the route
+   transition.
 
 5. **Polling, not push, for real-time-ish updates.** The feed polls
    `GET /posts` every 5 seconds. Reasons: (a) no backend changes needed
@@ -151,7 +156,43 @@ it" is exactly the kind of bug a happy-path-only build will ship.
 
 ---
 
-## 5. Gold tier — what I did, in one sentence each
+## 5. Silver tier — what's wired where
+
+All six silver requirements are in scope. Pointing each at the code so
+they're easy to find:
+
+- **Real routing.** `react-router-dom` v7 with `BrowserRouter` and
+  `Routes` in `src/App.tsx:20`; six route definitions for the six views
+  plus a `*` fallback to `/404`. URLs are bookmarkable and survive
+  refresh (verified manually + by the Playwright spec).
+- **Optimistic delete with rollback.** `src/pages/FeedPage.tsx:33`
+  (`handleDelete`) drives it; `src/hooks/useFeed.ts:179` onward (the
+  `restore` / `markPendingDelete` / `clearPendingDelete` API) is the
+  implementation. Demonstrated in `tests/unit/feed.test.tsx` (both the
+  rollback and the poll-race).
+- **Pagination UX.** "Load more" button at `src/pages/FeedPage.tsx:91`;
+  fed by `useFeed`'s `nextOffset` (`src/hooks/useFeed.ts:117`,
+  `loadMore`), which is set when a page response returns
+  `length === limit`.
+- **Keyboard shortcuts beyond Ctrl+Enter.** Five of them, registered
+  in `src/components/AppShell.tsx:18-58`: `?` (help), `t` (theme),
+  `n` (new post), `g f` (feed), `g u` (users). Surfaced in the help
+  overlay (`src/components/HelpOverlay.tsx:8`, `SHORTCUTS` array)
+  opened by `?` or the app-shell button.
+- **Tests.** 10 Vitest + RTL tests across three files in `tests/unit/`,
+  one Playwright e2e in `tests/e2e/flow.spec.ts`. `npm run test` and
+  `npm run test:e2e`.
+- **Basic accessibility.** Every input has an `htmlFor`-tied
+  `<label>` (`src/pages/ComposePage.tsx:71`,
+  `src/pages/SignupPage.tsx:83`); every icon button has an
+  `aria-label` (`src/components/AppShell.tsx:86,100,109`); no
+  `<div onClick>` posing as a button (the help-overlay backdrop has
+  `role="dialog"` and Escape-to-close in addition to backdrop click).
+  Focus ring on every interactive element via `:focus-visible`.
+
+---
+
+## 6. Gold tier — what I did, in one sentence each
 
 - **Real-time-ish updates.** `useFeed` polls `GET /posts` every 5 seconds,
   pauses when the tab is hidden, and merges new server posts in front of
@@ -170,7 +211,7 @@ it" is exactly the kind of bug a happy-path-only build will ship.
 
 ---
 
-## 6. Changes I made to my A2 backend
+## 7. Changes I made to my A2 backend
 
 Added `CORSMiddleware` to A2 `main.py` so the browser will let the
 frontend on `localhost:5173` see responses from `localhost:8000`. Allows
@@ -198,7 +239,7 @@ and that path is unchanged).
 
 ---
 
-## 7. Edge cases I specifically tested manually
+## 8. Edge cases I specifically tested manually
 
 - **Empty form submit:** post button is disabled until message is
   non-whitespace; can't be submitted by `Ctrl+Enter` either (the validity
