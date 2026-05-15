@@ -2,12 +2,16 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getUser, getUserPosts } from '../api/users'
 import { ApiError } from '../api/types'
+import { useIdentity } from '../auth/IdentityContext'
 import { PostCard } from '../components/feed/PostCard'
+import { BioEditor } from '../components/profile/BioEditor'
 import { LoadingRow, ErrorBanner, EmptyState } from '../components/states/States'
 import { formatRelative } from '../lib/formatTime'
 
 export default function UserProfilePage() {
   const { username = '' } = useParams<{ username: string }>()
+  const { username: viewer } = useIdentity()
+  const isOwn = viewer && username && viewer === username
 
   const userQ = useQuery({
     queryKey: ['user', username],
@@ -65,7 +69,9 @@ export default function UserProfilePage() {
               <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 36, fontWeight: 500, lineHeight: 1.1 }}>
                 @{userQ.data.username}
               </h1>
-              {userQ.data.bio ? (
+              {isOwn ? (
+                <BioEditor user={userQ.data} />
+              ) : userQ.data.bio ? (
                 <p style={{ marginTop: 12, fontFamily: 'var(--font-serif)', fontSize: 17, lineHeight: 1.5 }}>
                   {userQ.data.bio}
                 </p>

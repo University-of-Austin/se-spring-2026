@@ -40,6 +40,14 @@ export function PostCard({
         >
           @{post.username}
         </Link>
+        {!isOptimistic && post.updated_at && post.updated_at !== post.created_at ? (
+          <>
+            <span style={dot}>·</span>
+            <span style={{ fontStyle: 'italic', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-serif)', fontSize: 13 }}>
+              edited
+            </span>
+          </>
+        ) : null}
         {isOptimistic ? (
           <>
             <span style={dot}>·</span>

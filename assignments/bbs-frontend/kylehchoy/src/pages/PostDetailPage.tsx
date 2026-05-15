@@ -7,6 +7,7 @@ import { useIdentity } from '../auth/IdentityContext'
 import { LoadingRow, ErrorBanner } from '../components/states/States'
 import { ReactionBar } from '../components/reactions/ReactionBar'
 import { ReplyTree } from '../components/thread/ReplyTree'
+import { PostEditor } from '../components/post/PostEditor'
 import { formatRelative } from '../lib/formatTime'
 
 /**
@@ -53,6 +54,7 @@ export default function PostDetailPage() {
 
   const post = postQ.data
   const isAuthor = post && username && post.username === username
+  const [editing, setEditing] = useState(false)
   const onDelete = () => {
     if (!confirming) {
       setConfirming(true)
@@ -85,66 +87,96 @@ export default function PostDetailPage() {
             </Link>
             <span style={{ color: 'var(--gold)', margin: '0 6px' }}>·</span>
             <span>№ {post.id}</span>
+            {post.updated_at && post.updated_at !== post.created_at ? (
+              <>
+                <span style={{ color: 'var(--gold)', margin: '0 6px' }}>·</span>
+                <span style={{ fontStyle: 'italic', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-serif)', fontSize: 13 }}>
+                  edited {formatRelative(post.updated_at)}
+                </span>
+              </>
+            ) : null}
           </p>
 
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 19, lineHeight: 1.6, color: 'var(--black)' }}>
-            {post.message.split(/\n\s*\n/).map((p, i) => (
-              <p key={i} style={{ marginTop: i === 0 ? 0 : '0.6em' }}>{p}</p>
-            ))}
-          </div>
+          {editing ? (
+            <PostEditor post={post} onDone={() => setEditing(false)} />
+          ) : (
+            <>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 19, lineHeight: 1.6, color: 'var(--black)' }}>
+                {post.message.split(/\n\s*\n/).map((p, i) => (
+                  <p key={i} style={{ marginTop: i === 0 ? 0 : '0.6em' }}>{p}</p>
+                ))}
+              </div>
 
-          <ReactionBar post={post} />
+              <ReactionBar post={post} />
 
-          {isAuthor ? (
-            <div style={{ marginTop: 24 }}>
-              <button
-                type="button"
-                onClick={onDelete}
-                disabled={deleteMut.isPending}
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 10,
-                  letterSpacing: '0.18em',
-                  textTransform: 'uppercase',
-                  color: confirming ? '#b34a3a' : 'var(--gold)',
-                  background: 'transparent',
-                  border: `1px solid ${confirming ? '#b34a3a' : 'var(--gold)'}`,
-                  padding: '6px 14px',
-                  cursor: 'pointer',
-                }}
-              >
-                {deleteMut.isPending
-                  ? 'Deleting…'
-                  : confirming
-                    ? 'Click again to confirm delete'
-                    : 'Delete post'}
-              </button>
-              {confirming ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  style={{
-                    marginLeft: 12,
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: 10,
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    color: 'var(--muted)',
-                    background: 'transparent',
-                    border: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-              ) : null}
-              {deleteMut.isError ? (
-                <div style={{ marginTop: 16 }}>
-                  <ErrorBanner error={deleteMut.error} />
+              {isAuthor ? (
+                <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 10,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      color: 'var(--gold)',
+                      background: 'transparent',
+                      border: '1px solid var(--gold)',
+                      padding: '6px 14px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Edit post
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    disabled={deleteMut.isPending}
+                    style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 10,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      color: confirming ? '#b34a3a' : 'var(--muted)',
+                      background: 'transparent',
+                      border: `1px solid ${confirming ? '#b34a3a' : 'var(--hairline)'}`,
+                      padding: '6px 14px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {deleteMut.isPending
+                      ? 'Deleting…'
+                      : confirming
+                        ? 'Click again to confirm delete'
+                        : 'Delete post'}
+                  </button>
+                  {confirming ? (
+                    <button
+                      type="button"
+                      onClick={() => setConfirming(false)}
+                      style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: 10,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                        color: 'var(--muted)',
+                        background: 'transparent',
+                        border: 0,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                  {deleteMut.isError ? (
+                    <div style={{ marginTop: 16, width: '100%' }}>
+                      <ErrorBanner error={deleteMut.error} />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </div>
-          ) : null}
+            </>
+          )}
         </article>
       ) : null}
 
