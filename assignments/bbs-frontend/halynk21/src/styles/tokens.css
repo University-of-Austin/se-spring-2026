@@ -1,0 +1,125 @@
+/* ─── Design tokens ──────────────────────────────────────────────────────────
+ * Single source for color/type/space. Light is the default; dark is set either
+ * via [data-theme="dark"] (user override) or via prefers-color-scheme on
+ * :root:not([data-theme]) (system mode = no attribute).
+ *
+ * Hex values live in --color-*-* vars so they're defined once. Active tokens
+ * (--bg, --fg, ...) just point at the right variant — slightly less repetition
+ * than restating the hex in two places.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Light palette source */
+  --color-light-bg:        #ffffff;
+  --color-light-bg-muted:  #f5f5f7;
+  --color-light-bg-subtle: #fafafa;
+  --color-light-fg:        #111111;
+  --color-light-fg-muted:  #5e6066;
+  --color-light-border:    #e5e5e7;
+  --color-light-accent:    #0a66ff;
+  --color-light-accent-hover: #0052cc;
+  --color-light-accent-fg: #ffffff;
+  --color-light-danger:    #d92d20;
+  --color-light-danger-bg: #fef3f2;
+  --color-light-success:   #079455;
+
+  /* Dark palette source */
+  --color-dark-bg:         #0c0c0d;
+  --color-dark-bg-muted:   #181819;
+  --color-dark-bg-subtle:  #131314;
+  --color-dark-fg:         #f4f4f5;
+  --color-dark-fg-muted:   #a1a1aa;
+  --color-dark-border:     #27272a;
+  --color-dark-accent:     #5b9dff;
+  --color-dark-accent-hover: #7ab0ff;
+  --color-dark-accent-fg:  #0c0c0d;
+  --color-dark-danger:     #f87171;
+  --color-dark-danger-bg:  #2c1414;
+  --color-dark-success:    #4ade80;
+
+  /* Active tokens — default to light */
+  --bg:           var(--color-light-bg);
+  --bg-muted:     var(--color-light-bg-muted);
+  --bg-subtle:    var(--color-light-bg-subtle);
+  --fg:           var(--color-light-fg);
+  --fg-muted:     var(--color-light-fg-muted);
+  --border:       var(--color-light-border);
+  --accent:       var(--color-light-accent);
+  --accent-hover: var(--color-light-accent-hover);
+  --accent-fg:    var(--color-light-accent-fg);
+  --danger:       var(--color-light-danger);
+  --danger-bg:    var(--color-light-danger-bg);
+  --success:      var(--color-light-success);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Type scale */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.5rem;
+  --text-2xl:  2rem;
+  --line-tight: 1.25;
+  --line-base:  1.5;
+
+  /* Spacing scale (4px base) */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+  --space-12: 3rem;
+
+  /* Radii */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-full: 999px;
+
+  /* Layout */
+  --content-width: 720px;
+  --header-height: 56px;
+}
+
+/* User chose dark explicitly */
+:root[data-theme="dark"] {
+  --bg:           var(--color-dark-bg);
+  --bg-muted:     var(--color-dark-bg-muted);
+  --bg-subtle:    var(--color-dark-bg-subtle);
+  --fg:           var(--color-dark-fg);
+  --fg-muted:     var(--color-dark-fg-muted);
+  --border:       var(--color-dark-border);
+  --accent:       var(--color-dark-accent);
+  --accent-hover: var(--color-dark-accent-hover);
+  --accent-fg:    var(--color-dark-accent-fg);
+  --danger:       var(--color-dark-danger);
+  --danger-bg:    var(--color-dark-danger-bg);
+  --success:      var(--color-dark-success);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+/* No attribute set ("system" mode) and OS prefers dark */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:           var(--color-dark-bg);
+    --bg-muted:     var(--color-dark-bg-muted);
+    --bg-subtle:    var(--color-dark-bg-subtle);
+    --fg:           var(--color-dark-fg);
+    --fg-muted:     var(--color-dark-fg-muted);
+    --border:       var(--color-dark-border);
+    --accent:       var(--color-dark-accent);
+    --accent-hover: var(--color-dark-accent-hover);
+    --accent-fg:    var(--color-dark-accent-fg);
+    --danger:       var(--color-dark-danger);
+    --danger-bg:    var(--color-dark-danger-bg);
+    --success:      var(--color-dark-success);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
