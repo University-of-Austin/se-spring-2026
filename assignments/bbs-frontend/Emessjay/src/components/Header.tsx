@@ -15,7 +15,7 @@ type Tab = { to: string; label: string; end?: boolean };
 
 const tabs: Tab[] = [
   { to: paths.feed(), label: "Feed", end: true },
-  { to: paths.compose(), label: "Compose" },
+  { to: paths.compose(), label: "Post" },
   { to: paths.users(), label: "Users" },
   { to: paths.identity(), label: "Identity" },
 ];

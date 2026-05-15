@@ -70,10 +70,13 @@
   box-sizing: border-box;
 }
 
+html {
+  background: var(--color-bg);
+}
+
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -83,6 +86,15 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Body must NOT have a solid background — the sunset pseudo-elements
+   sit at z-index: -2 / -1 and would be painted behind body's own bg
+   (body is not a stacking-context root by default, so negative-z
+   children paint in step 2 of html's context, before body's bg in
+   step 3).  Leaving body transparent lets the sunset show through. */
+body {
+  background: transparent;
+}
+
 /* Miami sunset sky — fixed full-viewport layer behind everything.
    Layered top-to-bottom in the gradient stack (so first listed
    sits on top): the sun, a horizon glow, and the navy→pink sky. */
@@ -90,48 +102,99 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
   pointer-events: none;
   background-image:
-    radial-gradient(circle 14vw at 50% 72%,
+    /* Sun — dome only.  Sized and positioned in vh so it stays
+       locked to the horizon (which is at 60vh): 24vh-wide box,
+       12vh tall, top edge at 48vh → bottom edge at exactly 60vh.
+       The radial-gradient is centered at the bottom of its box,
+       so only the upper half of the circle renders.  Using vh
+       throughout (instead of mixing vw with a vh-anchored
+       horizon) prevents drift on window resize. */
+    radial-gradient(circle 20vh at 50% 100%,
                     rgba(255, 224, 130, 0.95) 0%,
                     rgba(255, 168, 70, 0.85) 35%,
                     rgba(255, 94, 58, 0.7) 60%,
                     rgba(255, 46, 154, 0.45) 85%,
                     transparent 100%),
-    radial-gradient(ellipse 70% 18% at 50% 72%, rgba(255, 46, 154, 0.5), transparent 75%),
+    /* Water reflection — a vertically-squashed half-circle.  Same
+       horizontal radius as the sun (20vh) so it lines up edge to
+       edge, but height crushed to 4vh, fanning down from 60vh.
+       Drawn as an ellipse so the vertical squash is part of the
+       gradient itself, not just clipping. */
+    radial-gradient(ellipse 20vh 4vh at 50% 0%,
+                    rgba(255, 168, 70, 0.55) 0%,
+                    rgba(255, 94, 58, 0.3) 55%,
+                    transparent 100%),
+    radial-gradient(ellipse 70% 14% at 50% 60%, rgba(255, 46, 154, 0.5), transparent 75%),
     linear-gradient(to bottom,
                     #050524 0%,
-                    #0d0a40 28%,
-                    #2a0f58 52%,
-                    #6a1872 65%,
-                    #c81f6e 71%,
-                    #050015 72%,
+                    #0d0a40 22%,
+                    #2a0f58 44%,
+                    #6a1872 54%,
+                    #c81f6e 59%,
+                    #050015 60%,
                     #050015 100%);
-  background-size: 100% 100%;
+  background-size:
+    40vh 20vh,
+    40vh 4vh,
+    100% 100%,
+    100% 100%;
+  background-position:
+    50% 40vh,
+    50% 60vh,
+    0 0,
+    0 0;
+  background-repeat: no-repeat;
 }
 
-/* The Outrun perspective floor — a cyan grid tilted into the
-   distance, sitting in the bottom 38% of the viewport so it lines
-   up with the horizon in the sky gradient above.  The mask fades
-   the grid as it approaches the vanishing point so the lines
-   don't terminate in a hard edge. */
+/* The Outrun perspective floor — a cyan/pink grid receding toward
+   the horizon line at 50% Y.  Covers the bottom 50vh.  Lower rotateX
+   keeps the grid standing up more (steeper-looking lines) and a
+   tight 180px perspective compresses the far end dramatically.
+   The mask fades the lines as they approach the horizon so they
+   don't terminate in a hard edge near the middle of the screen. */
 body::after {
   content: "";
   position: fixed;
   left: -50%;
   right: -50%;
   bottom: 0;
-  height: 28vh;
+  height: 55vh;
   z-index: -1;
   pointer-events: none;
-  transform: perspective(380px) rotateX(58deg);
+  transform: perspective(420px) rotateX(48deg);
   transform-origin: 50% 100%;
   background:
-    linear-gradient(to right,  rgba(0, 240, 255, 0.55) 1px, transparent 1px) 0 0 / 56px 100%,
-    linear-gradient(to bottom, rgba(255, 46, 154, 0.55) 1px, transparent 1px) 0 0 / 100% 36px;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 35%, #000 100%);
-          mask-image: linear-gradient(to bottom, transparent 0%, #000 35%, #000 100%);
+    linear-gradient(to right,  rgba(0, 240, 255, 0.7) 1px, transparent 1px) 0 0 / 56px 100%,
+    linear-gradient(to bottom, rgba(255, 46, 154, 0.7) 1px, transparent 1px) 0 0 / 100% 36px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+}
+
+/* Mirror grid in the sky — same construction but anchored at the
+   top of the viewport with the rotation inverted so the vanishing
+   point sits at the bottom edge (the horizon line at 50% Y).
+   Lives on html::before since body's two pseudo-element slots are
+   spoken for.  Stacking: above the sunset gradient (z:-3), below
+   the floor grid (z:-1). */
+html::before {
+  content: "";
+  position: fixed;
+  left: -50%;
+  right: -50%;
+  top: 0;
+  height: 75vh;
+  z-index: -2;
+  pointer-events: none;
+  transform: perspective(420px) rotateX(-48deg);
+  transform-origin: 50% 0%;
+  background:
+    linear-gradient(to right,  rgba(0, 240, 255, 0.5) 1px, transparent 1px) 0 0 / 56px 100%,
+    linear-gradient(to bottom, rgba(255, 46, 154, 0.5) 1px, transparent 1px) 0 0 / 100% 36px;
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+          mask-image: linear-gradient(to top, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
 }
 
 button {

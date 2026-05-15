@@ -65,11 +65,17 @@ export function OptimisticPostsProvider({ children }: { children: ReactNode }) {
   const startSubmission = useCallback(
     async (entry: PendingPost): Promise<{ ok: boolean }> => {
       try {
-        await createPost(entry.message, entry.username);
-        // Confirm: mark as 'confirmed' for the brief crossover window,
-        // bump feedVersion so usePosts refetches, then schedule removal.
+        const created = await createPost(entry.message, entry.username);
+        // Confirm: record the real id so FeedView can swap us out the
+        // moment the refetch returns, bump feedVersion to trigger that
+        // refetch, and keep a timeout as a fallback in case the refetch
+        // is slow or fails.
         setPending((p) =>
-          p.map((x) => (x.tempId === entry.tempId ? { ...x, status: "confirmed" } : x)),
+          p.map((x) =>
+            x.tempId === entry.tempId
+              ? { ...x, status: "confirmed", confirmedId: created.id }
+              : x,
+          ),
         );
         setFeedVersion((v) => v + 1);
         setTimeout(() => {

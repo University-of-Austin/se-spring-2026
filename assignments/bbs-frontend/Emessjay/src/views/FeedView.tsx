@@ -19,6 +19,7 @@ import { usePosts } from "../hooks/usePosts";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useOptimisticPosts } from "../hooks/useOptimisticPosts";
 import { useShortcuts } from "../hooks/useShortcuts";
+import { usePoll } from "../hooks/usePoll";
 import { PostRow } from "../components/PostRow";
 import { PendingPostRow } from "../components/PendingPostRow";
 import { Loadable } from "../components/Loadable";
@@ -35,6 +36,14 @@ export function FeedView() {
   const state = usePosts({ limit, offset: 0, q: debouncedQ });
   const { pending, retry, dismiss } = useOptimisticPosts();
   const { registerSearchFocus } = useShortcuts();
+
+  // Real-time-ish updates: poll the feed every 5s so a post made by
+  // another user appears without a manual refresh.  Pauses while the
+  // tab is hidden.  Polling-vs-push: A2 is REST-only and adding SSE
+  // or websockets there is more invasive than the gold tier asks for;
+  // a 5s polling cadence on a low-traffic feed is comfortably within
+  // the assignment's "~5 seconds" budget and costs one cheap GET.
+  usePoll(state.refetch, 5000);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -96,11 +105,20 @@ export function FeedView() {
               : "No posts yet. Be the first."
         }
       >
-        {(posts) => (
+        {(posts) => {
+          // Once the refetched feed contains a confirmed post's real
+          // id, the live row supersedes the optimistic one — drop the
+          // pending entry now rather than waiting for the fallback
+          // timeout, otherwise both render for a beat.
+          const liveIds = new Set(posts.map((p) => p.id));
+          const visiblePending = pending.filter(
+            (p) => p.confirmedId === undefined || !liveIds.has(p.confirmedId),
+          );
+          return (
           <>
             <div className={styles.list}>
               {showOptimistic &&
-                pending.map((p) => (
+                visiblePending.map((p) => (
                   <PendingPostRow
                     key={p.tempId}
                     post={p}
@@ -128,7 +146,8 @@ export function FeedView() {
               </>
             )}
           </>
-        )}
+          );
+        }}
       </Loadable>
 
       {/* Optimistic-only render: empty server state but we have a pending entry. */}

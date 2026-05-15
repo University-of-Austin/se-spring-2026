@@ -52,7 +52,8 @@ test("full flow: create user, switch to them, post, see in feed, delete", async 
   await expect(page.getByText(new RegExp(`posting as @${username}`))).toBeVisible();
 
   // ─── Post a message via Compose ───────────────────────────────
-  await page.getByRole("link", { name: "Compose" }).click();
+  // The nav link is labeled "Post" (the route is still /compose).
+  await page.getByRole("link", { name: "Post" }).click();
   await expect(page).toHaveURL("/compose");
 
   await page.getByLabel("Message").fill(message);

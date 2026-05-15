@@ -5,11 +5,17 @@
 // brought up by a single `npm run test:e2e` invocation, as the gold
 // tier requires.
 //
-// reuseExistingServer is true in dev so that when you already have
-// uvicorn / vite running in their own terminals, the tests just
-// hook into them rather than fighting over the ports.
+// The e2e stack runs on its own port pair (backend 8001, frontend
+// 5174) and its own SQLite file (bbs-e2e.db).  This isolates it
+// from any dev uvicorn/vite running on 8000/5173 against the real
+// bbs.db, so the test cannot pollute the production database.
+// reuseExistingServer is left false for both so we never latch
+// onto a stray server pointed at the wrong DB.
 
 import { defineConfig, devices } from "@playwright/test";
+
+const E2E_API_PORT = 8001;
+const E2E_WEB_PORT = 5174;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -19,23 +25,31 @@ export default defineConfig({
   reporter: "list",
   timeout: 30_000,
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: `http://localhost:${E2E_WEB_PORT}`,
     trace: "on-first-retry",
   },
   webServer: [
     {
       // Start the A2 FastAPI server using the venv's uvicorn so we
       // don't depend on whatever uvicorn the user has globally.
-      command: "../.venv/bin/uvicorn main:app --port 8000",
+      // BBS_DB_FILE points at a dedicated e2e SQLite file so the
+      // real bbs.db is never touched.
+      command: `../.venv/bin/uvicorn main:app --port ${E2E_API_PORT}`,
       cwd: "../../bbs-webserver/Emessjay/webserver",
-      url: "http://localhost:8000/users",
-      reuseExistingServer: !process.env.CI,
+      env: { BBS_DB_FILE: "bbs-e2e.db" },
+      url: `http://localhost:${E2E_API_PORT}/users`,
+      reuseExistingServer: false,
       timeout: 30_000,
     },
     {
-      command: "npm run dev",
-      url: "http://localhost:5173",
-      reuseExistingServer: !process.env.CI,
+      // Vite picks up VITE_API_BASE at startup; the frontend's
+      // api/client.ts reads it via import.meta.env.  Forcing the
+      // port here keeps the e2e frontend on its own slot so it
+      // doesn't collide with a dev `npm run dev` on 5173.
+      command: `npm run dev -- --port ${E2E_WEB_PORT} --strictPort`,
+      env: { VITE_API_BASE: `http://localhost:${E2E_API_PORT}` },
+      url: `http://localhost:${E2E_WEB_PORT}`,
+      reuseExistingServer: false,
       timeout: 30_000,
     },
   ],
