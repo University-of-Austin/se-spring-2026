@@ -1,0 +1,93 @@
+/*
+ * Design tokens. One source of truth for color, spacing, type, and radii.
+ * Light theme is the default; data-theme="dark" on <html> swaps the palette
+ * (set by ThemeContext). The type scale is a modular scale of 1.250 (major
+ * third) anchored at 16px. The spacing scale is an 8px grid.
+ */
+:root {
+  /* Type scale */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --fs-xs: 0.75rem;     /* 12px */
+  --fs-sm: 0.875rem;    /* 14px */
+  --fs-md: 1rem;        /* 16px */
+  --fs-lg: 1.25rem;     /* 20px */
+  --fs-xl: 1.5625rem;   /* 25px */
+  --fs-xxl: 1.953rem;   /* 31px */
+  --fs-display: 2.441rem; /* 39px */
+  --lh-tight: 1.2;
+  --lh-snug: 1.35;
+  --lh-normal: 1.55;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+
+  /* Spacing (8px grid) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --container: 720px;
+  --shell-pad: var(--space-4);
+
+  /* Motion */
+  --transition: 150ms ease;
+
+  /* Light palette (default) */
+  --c-bg: #fafaf7;
+  --c-surface: #ffffff;
+  --c-surface-alt: #f3f2ec;
+  --c-border: #e6e3d8;
+  --c-border-strong: #d4d0bf;
+  --c-text: #1d1d1b;
+  --c-text-muted: #5d5b50;
+  --c-text-inverse: #fafaf7;
+  --c-accent: #b54a0a;        /* burnt orange */
+  --c-accent-hover: #963c08;
+  --c-accent-soft: #fcebd9;
+  --c-link: #a8410a;
+  --c-danger: #b3261e;
+  --c-danger-bg: #fbeae8;
+  --c-success: #226a3c;
+  --c-overlay: rgba(20, 20, 18, 0.45);
+  --shadow-sm: 0 1px 2px rgba(20, 20, 18, 0.05);
+  --shadow-md: 0 6px 18px rgba(20, 20, 18, 0.08);
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --c-bg: #15161a;
+  --c-surface: #1c1e23;
+  --c-surface-alt: #25282f;
+  --c-border: #2f333c;
+  --c-border-strong: #3d424c;
+  --c-text: #ecebe6;
+  --c-text-muted: #9b9a92;
+  --c-text-inverse: #15161a;
+  --c-accent: #f4a261;
+  --c-accent-hover: #e08a3f;
+  --c-accent-soft: #2f261f;
+  --c-link: #f4a261;
+  --c-danger: #ef5450;
+  --c-danger-bg: #2e1a18;
+  --c-success: #6ea579;
+  --c-overlay: rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
