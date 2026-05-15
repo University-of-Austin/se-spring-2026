@@ -4,17 +4,19 @@
 
 .post {
   background: var(--color-bg-soft);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-bright);
   border-radius: var(--radius);
   padding: var(--space-4);
+  box-shadow: 0 0 30px rgba(255, 46, 154, 0.12);
 }
 
 .message {
   margin: 0 0 var(--space-3) 0;
   font-size: var(--font-size-lg);
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  color: var(--color-text);
 }
 
 .meta {
@@ -35,15 +37,20 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
 .delete:hover:not(:disabled) {
   background: var(--color-danger);
-  color: white;
+  color: var(--color-bg);
+  box-shadow: var(--glow-pink);
 }
 
 .delete:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }

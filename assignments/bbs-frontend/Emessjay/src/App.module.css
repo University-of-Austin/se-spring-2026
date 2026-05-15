@@ -4,83 +4,58 @@
   min-height: 100vh;
   border-left: 1px solid var(--color-border);
   border-right: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--color-bg) 85%, transparent);
-}
-
-.brandRow {
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: var(--space-3) var(--space-4) var(--space-2) var(--space-4);
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.brand {
-  margin: 0;
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-accent);
-}
-
-.who {
-  font-size: var(--font-size-sm);
-  color: var(--color-muted);
-}
-
-.nav {
-  display: flex;
-  gap: var(--space-1);
-  padding: 0 var(--space-2) var(--space-1) var(--space-2);
-  overflow-x: auto;
-}
-
-.tab {
-  background: transparent;
-  border: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  position: relative;
-}
-
-.tab:hover {
-  color: var(--color-text);
-}
-
-.tabActive {
-  color: var(--color-text);
-}
-
-.tabActive::after {
-  content: "";
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-accent);
-  border-radius: 2px;
+  flex-direction: column;
+  box-shadow: 0 0 60px rgba(255, 46, 154, 0.12);
 }
 
 .main {
-  display: block;
+  flex: 1 1 auto;
+}
+
+.footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.04em;
+}
+
+.footer kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-bright);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-bg-soft);
+  color: var(--color-accent-2);
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 0.9em;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.55);
+}
+
+/* Skip-to-main link — hidden until focused.  Visible only when the
+   user tabs to it, which is the screen-reader / keyboard pattern. */
+.skipLink {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  text-decoration: none;
+  border-radius: 0 0 var(--radius) 0;
+  z-index: 100;
+  box-shadow: var(--glow-green);
+}
+
+.skipLink:focus {
+  left: 0;
 }
 
 @media (max-width: 480px) {

@@ -1,7 +1,12 @@
-// User profile = the user record + their posts.  Two hooks; each one
-// is wrapped in its own <Loadable> so they can render independently —
-// if posts are slow, we still show the name first.
+// User profile = the user record + their posts.  Two hooks, two
+// independent Loadables — if posts are slow, we still show the
+// name first.
+//
+// The :username route param is a string from useParams.  A2 already
+// validates the format on its side; if a user goes to /users/!!! the
+// server returns 404 and Loadable renders the not-found view.
 
+import { useParams } from "react-router-dom";
 import { useUser, useUserPosts } from "../hooks/useUser";
 import { Loadable } from "../components/Loadable";
 import { PostRow } from "../components/PostRow";
@@ -9,7 +14,8 @@ import { Timestamp } from "../components/Timestamp";
 import { NotFoundView } from "../components/NotFoundView";
 import styles from "./UserProfileView.module.css";
 
-export function UserProfileView({ username }: { username: string }) {
+export function UserProfileView() {
+  const { username = "" } = useParams<{ username: string }>();
   const userState = useUser(username);
   const postsState = useUserPosts(username);
 
@@ -34,7 +40,6 @@ export function UserProfileView({ username }: { username: string }) {
         <Loadable
           state={postsState}
           emptyMessage={`@${username} hasn't posted yet.`}
-          notFoundView={null}
         >
           {(posts) => (
             <div className={styles.posts}>

@@ -6,4 +6,5 @@
   border-radius: var(--radius);
   font-size: var(--font-size-sm);
   border-left: 3px solid var(--color-danger);
+  box-shadow: 0 0 12px rgba(255, 94, 58, 0.2);
 }

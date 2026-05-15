@@ -1,88 +1,60 @@
-// Top-level shell.  Composes the two providers (current user,
-// router), renders the persistent chrome (header + nav), and
-// dispatches to the right view based on route.view.
+// Top-level shell.  Composes the global providers and renders the
+// persistent chrome (header + nav).  The body of the app is
+// react-router-dom's <Routes>.
 //
 // Kept deliberately short — the assignment names "App.tsx is 800
 // lines" as the canonical style-points failure mode.
 
-import { CurrentUserProvider, useCurrentUser } from "./hooks/useCurrentUser";
-import { RouterProvider, useRouter } from "./router/useRouter";
-import type { Route } from "./router/useRouter";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { CurrentUserProvider } from "./hooks/useCurrentUser";
+import { OptimisticPostsProvider } from "./hooks/useOptimisticPosts";
+import { ShortcutsProvider } from "./hooks/useShortcuts";
+import { Header } from "./components/Header";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { FeedView } from "./views/FeedView";
 import { ComposeView } from "./views/ComposeView";
 import { UserListView } from "./views/UserListView";
 import { UserProfileView } from "./views/UserProfileView";
 import { PostDetailView } from "./views/PostDetailView";
 import { IdentityView } from "./views/IdentityView";
+import { NotFoundView } from "./components/NotFoundView";
 import styles from "./App.module.css";
 
-function renderRoute(route: Route) {
-  switch (route.view) {
-    case "feed": return <FeedView />;
-    case "compose": return <ComposeView />;
-    case "users": return <UserListView />;
-    case "user": return <UserProfileView username={route.username} />;
-    case "post": return <PostDetailView id={route.id} />;
-    case "identity": return <IdentityView />;
-  }
-}
-
-function Header() {
-  const { route, navigate } = useRouter();
-  const { username } = useCurrentUser();
-
-  const tabs: { view: Route["view"]; label: string; route: Route }[] = [
-    { view: "feed", label: "Feed", route: { view: "feed" } },
-    { view: "compose", label: "Compose", route: { view: "compose" } },
-    { view: "users", label: "Users", route: { view: "users" } },
-    { view: "identity", label: "Identity", route: { view: "identity" } },
-  ];
-
-  return (
-    <header className={styles.header}>
-      <div className={styles.brandRow}>
-        <h1 className={styles.brand}>bbs</h1>
-        <span className={styles.who}>
-          {username ? (
-            <>posting as <strong>@{username}</strong></>
-          ) : (
-            <em>not signed in</em>
-          )}
-        </span>
-      </div>
-      <nav className={styles.nav} aria-label="Main">
-        {tabs.map((t) => (
-          <button
-            key={t.view}
-            type="button"
-            className={`${styles.tab} ${route.view === t.view ? styles.tabActive : ""}`}
-            aria-current={route.view === t.view ? "page" : undefined}
-            onClick={() => navigate(t.route)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-    </header>
-  );
-}
-
 function Shell() {
-  const { route } = useRouter();
   return (
     <div className={styles.shell}>
+      <a href="#main" className={styles.skipLink}>Skip to main content</a>
       <Header />
-      <main className={styles.main}>{renderRoute(route)}</main>
+      <main id="main" className={styles.main}>
+        <Routes>
+          <Route path="/" element={<FeedView />} />
+          <Route path="/compose" element={<ComposeView />} />
+          <Route path="/users" element={<UserListView />} />
+          <Route path="/users/:username" element={<UserProfileView />} />
+          <Route path="/posts/:id" element={<PostDetailView />} />
+          <Route path="/identity" element={<IdentityView />} />
+          <Route path="/feed" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundView what="This page" />} />
+        </Routes>
+      </main>
+      <ShortcutsHelp />
+      <footer className={styles.footer}>
+        Press <kbd>?</kbd> for keyboard shortcuts
+      </footer>
     </div>
   );
 }
 
 export default function App() {
   return (
-    <CurrentUserProvider>
-      <RouterProvider>
-        <Shell />
-      </RouterProvider>
-    </CurrentUserProvider>
+    <BrowserRouter>
+      <CurrentUserProvider>
+        <OptimisticPostsProvider>
+          <ShortcutsProvider>
+            <Shell />
+          </ShortcutsProvider>
+        </OptimisticPostsProvider>
+      </CurrentUserProvider>
+    </BrowserRouter>
   );
 }

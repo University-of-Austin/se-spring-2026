@@ -1,11 +1,11 @@
+import { Link } from "react-router-dom";
 import { useUsers } from "../hooks/useUsers";
-import { useRouter } from "../router/useRouter";
 import { Loadable } from "../components/Loadable";
+import { paths } from "../router/paths";
 import styles from "./UserListView.module.css";
 
 export function UserListView() {
   const state = useUsers();
-  const { navigate } = useRouter();
 
   return (
     <div className={styles.wrap}>
@@ -15,16 +15,12 @@ export function UserListView() {
           <ul className={styles.list}>
             {users.map((u) => (
               <li key={u.username} className={styles.item}>
-                <button
-                  type="button"
-                  className={styles.row}
-                  onClick={() => navigate({ view: "user", username: u.username })}
-                >
+                <Link to={paths.user(u.username)} className={styles.row}>
                   <span className={styles.name}>@{u.username}</span>
                   <span className={styles.count}>
                     {u.post_count} {u.post_count === 1 ? "post" : "posts"}
                   </span>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>

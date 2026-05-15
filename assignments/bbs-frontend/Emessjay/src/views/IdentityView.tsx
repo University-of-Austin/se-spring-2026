@@ -1,30 +1,24 @@
 // Sign up + switch user, plus a "currently posting as" banner.
 //
-// Two forms in one page:
-//   1) Create a new user.  Validates the username against A2's regex
-//      and length bounds on every keystroke; submit disabled when
-//      invalid.  On 409 (duplicate), shows inline "username taken".
-//   2) Switch to an existing user.  Populated from GET /users.
-//
-// Sign-out clears localStorage via useCurrentUser().setUsername(null).
-// We don't talk to the server for sign-in/sign-out — X-Username is
-// just a header we attach to the next POST.
+// The usernameValidity helper is exported so a unit test can pin it
+// down without rendering the whole view.
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useUsers } from "../hooks/useUsers";
-import { useRouter } from "../router/useRouter";
 import { createUser } from "../api/endpoints";
 import { ApiError } from "../api/client";
 import { Loadable } from "../components/Loadable";
 import { ApiErrorMessage } from "../components/ApiErrorMessage";
+import { paths } from "../router/paths";
 import styles from "./IdentityView.module.css";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
 const MIN_LEN = 3;
 const MAX_LEN = 20;
 
-function usernameValidity(name: string): { ok: boolean; reason: string | null } {
+export function usernameValidity(name: string): { ok: boolean; reason: string | null } {
   if (name.length === 0) return { ok: false, reason: null };
   if (name.length < MIN_LEN) return { ok: false, reason: `At least ${MIN_LEN} characters.` };
   if (name.length > MAX_LEN) return { ok: false, reason: `At most ${MAX_LEN} characters.` };
@@ -34,15 +28,13 @@ function usernameValidity(name: string): { ok: boolean; reason: string | null } 
 
 export function IdentityView() {
   const { username, setUsername } = useCurrentUser();
-  const { navigate } = useRouter();
+  const navigate = useNavigate();
 
-  // Sign-up form state
   const [newName, setNewName] = useState("");
   const [signupError, setSignupError] = useState<ApiError | null>(null);
   const [signupBusy, setSignupBusy] = useState(false);
   const validity = usernameValidity(newName);
 
-  // Switch-user form state
   const usersState = useUsers();
   const [pickedUser, setPickedUser] = useState("");
 
@@ -54,7 +46,7 @@ export function IdentityView() {
       const u = await createUser(newName);
       setUsername(u.username);
       setNewName("");
-      navigate({ view: "feed" });
+      navigate(paths.feed());
     } catch (err) {
       setSignupError(err instanceof ApiError ? err : new ApiError(0, "Sign up failed"));
     } finally {
@@ -65,7 +57,7 @@ export function IdentityView() {
   function onSwitch() {
     if (pickedUser) {
       setUsername(pickedUser);
-      navigate({ view: "feed" });
+      navigate(paths.feed());
     }
   }
 

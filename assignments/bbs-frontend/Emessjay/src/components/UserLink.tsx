@@ -1,22 +1,19 @@
-// A clickable username that navigates to the user's profile.
-// Rendered as a real <button> for keyboard accessibility — never a
-// <div onClick>.
+// Clickable username — a real <Link>, not a button.  React-router's
+// Link emits a real <a href> so middle-click-to-open-in-new-tab and
+// right-click-copy-link work as the user expects.
 
-import { useRouter } from "../router/useRouter";
+import { Link } from "react-router-dom";
+import { paths } from "../router/paths";
 import styles from "./UserLink.module.css";
 
 export function UserLink({ username }: { username: string }) {
-  const { navigate } = useRouter();
   return (
-    <button
-      type="button"
+    <Link
+      to={paths.user(username)}
       className={styles.link}
-      onClick={(e) => {
-        e.stopPropagation();
-        navigate({ view: "user", username });
-      }}
+      onClick={(e) => e.stopPropagation()}
     >
       @{username}
-    </button>
+    </Link>
   );
 }

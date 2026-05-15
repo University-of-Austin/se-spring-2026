@@ -1,51 +1,47 @@
 // Compose a new post.
 //
-// Validation lives in two places, deliberately:
-//   - Client (this file): disable Submit on empty/over-length input
-//     so the obvious mistakes don't even reach the server.
-//   - Server: still authoritative.  We render any 422 detail inline,
-//     never suppress one because client-side thought the input was
-//     fine.  ("Do not eat it" — assignment, verbatim.)
+// At silver tier, submit is optimistic: we hand the message off to
+// OptimisticPostsContext which makes it appear in the feed
+// immediately, then we navigate to the feed.  The actual POST is
+// owned by the context, so it survives this view unmounting.
 //
-// Keyboard: Cmd+Enter / Ctrl+Enter submits from the textarea, which
-// matches Slack/Discord muscle memory.
+// Validation lives in two places:
+//   - Client: disable Submit on empty / over-length input.
+//   - Server: still authoritative.  Failed posts surface in the feed
+//     as a "failed" pending entry with the server's detail string —
+//     this view never sees the error directly because we navigate
+//     away before it returns.
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCurrentUser } from "../hooks/useCurrentUser";
-import { useRouter } from "../router/useRouter";
-import { createPost } from "../api/endpoints";
-import { ApiError } from "../api/client";
-import { ApiErrorMessage } from "../components/ApiErrorMessage";
+import { useOptimisticPosts } from "../hooks/useOptimisticPosts";
+import { paths } from "../router/paths";
 import styles from "./ComposeView.module.css";
 
 const MAX_LENGTH = 500;
 
 export function ComposeView() {
   const { username } = useCurrentUser();
-  const { navigate } = useRouter();
+  const { submit } = useOptimisticPosts();
+  const navigate = useNavigate();
 
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<ApiError | null>(null);
 
   const trimmed = message.trim();
   const tooLong = message.length > MAX_LENGTH;
   const canSubmit = !!username && trimmed.length > 0 && !tooLong && !submitting;
 
-  async function submit() {
+  async function onSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
-    setError(null);
-    try {
-      await createPost(message, username!);
-      setMessage("");
-      navigate({ view: "feed" });
-    } catch (err) {
-      if (err instanceof ApiError) setError(err);
-      else setError(new ApiError(0, "Unexpected error"));
-    } finally {
-      setSubmitting(false);
-    }
+    const messageToSend = message;
+    setMessage(""); // optimistic input clear
+    // Fire and forget — the optimistic context owns the lifecycle.
+    submit(messageToSend, username!);
+    navigate(paths.feed());
+    setSubmitting(false);
   }
 
   return (
@@ -58,7 +54,7 @@ export function ComposeView() {
           <button
             type="button"
             className={styles.signinButton}
-            onClick={() => navigate({ view: "identity" })}
+            onClick={() => navigate(paths.identity())}
           >
             Set a username
           </button>
@@ -68,7 +64,7 @@ export function ComposeView() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          submit();
+          onSubmit();
         }}
         className={styles.form}
       >
@@ -83,7 +79,7 @@ export function ComposeView() {
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
-              submit();
+              onSubmit();
             }
           }}
           rows={5}
@@ -96,16 +92,10 @@ export function ComposeView() {
             {message.length} / {MAX_LENGTH}
           </span>
           <span className={styles.hint}>⌘⏎ / Ctrl+⏎ to post</span>
-          <button
-            type="submit"
-            className={styles.submit}
-            disabled={!canSubmit}
-          >
-            {submitting ? "Posting…" : "Post"}
+          <button type="submit" className={styles.submit} disabled={!canSubmit}>
+            Post
           </button>
         </div>
-
-        {error && <ApiErrorMessage error={error} />}
       </form>
     </div>
   );

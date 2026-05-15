@@ -6,10 +6,12 @@
   color: var(--color-accent);
   cursor: pointer;
   font-weight: 600;
+  text-decoration: none;
+  transition: text-shadow 0.15s;
 }
 
 .link:hover {
-  text-decoration: underline;
+  text-shadow: var(--glow-purple);
 }
 
 .link:focus-visible {

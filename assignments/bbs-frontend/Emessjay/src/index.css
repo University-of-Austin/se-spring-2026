@@ -1,29 +1,49 @@
-/* Design tokens.  Every other stylesheet pulls from these custom
-   properties — change a value here and the whole UI follows.
-   This is also where a future dark-mode gold-tier feature would
-   live: redeclare the colors inside an @media or [data-theme] block. */
+/* ─────────────────────────────────────────────────────────────────
+   JBBS — Miami synthwave design tokens.
+
+   Theme rules:
+   - Deep navy-purple sky background with a sunset horizon glow.
+   - Hot-pink primary accent (links, focus rings, navigation).
+   - Electric-cyan secondary accent (primary buttons, brand highlight,
+     positive state).
+   - Sunset-orange for danger states.
+   - Orbitron everywhere, with weight ladder 400/500/600/700/900.
+
+   Any change to the look-and-feel of the whole app starts here;
+   every component CSS module reads from these custom properties.
+   ───────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Surface colors */
-  --color-bg: #ffffff;
-  --color-bg-soft: #f6f7f9;
-  --color-bg-hover: #f1f3f5;
-  --color-border: #e3e6ea;
+  /* Surface colors — night sky over Miami beach */
+  --color-bg:        #0a0a2e;
+  --color-bg-soft:   #15154a;
+  --color-bg-hover:  #20206b;
+  --color-border:    #3a2e7a;
+  --color-border-bright: #6a4fc8;
 
-  /* Text colors */
-  --color-text: #1a1d21;
-  --color-muted: #6b7280;
+  /* Text */
+  --color-text:      #fde6ff;
+  --color-muted:     #9d8fc4;
 
-  /* Accent (a calm blue-violet, not the React/Vite defaults) */
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
+  /* Hot pink — primary accent (links, nav, focus) */
+  --color-accent:        #ff2e9a;
+  --color-accent-hover:  #ff6cb9;
 
-  /* Danger (form errors, delete confirmations) */
-  --color-danger: #dc2626;
-  --color-danger-text: #991b1b;
-  --color-danger-bg: #fee2e2;
+  /* Electric cyan — secondary accent (primary buttons, brand) */
+  --color-accent-2:        #00f0ff;
+  --color-accent-2-hover:  #66f8ff;
 
-  /* Spacing ladder — geometric-ish, easy to memorise */
+  /* Danger — sunset orange, on a dark crimson wash */
+  --color-danger:       #ff5e3a;
+  --color-danger-text:  #ff8466;
+  --color-danger-bg:    #2a0e1a;
+
+  /* Glow effects layered via text-shadow / box-shadow */
+  --glow-purple: 0 0 10px rgba(255, 46, 154, 0.55);
+  --glow-green:  0 0 10px rgba(0, 240, 255, 0.5);
+  --glow-pink:   0 0 10px rgba(255, 94, 58, 0.5);
+
+  /* Spacing ladder */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -31,19 +51,21 @@
   --space-5: 1.5rem;
   --space-6: 2.5rem;
 
-  /* Type scale — three sizes, no more */
+  /* Type scale */
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
   --font-size-lg: 1.25rem;
-  --font-size-xl: 1.75rem;
+  --font-size-xl: 1.875rem;
 
-  --radius: 6px;
+  --radius: 4px;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  /* Orbitron is the entire type system.  At display weight it reads
+     like a CRT readout; at 400 it's still legible for body copy. */
+  --font-sans: "Orbitron", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* Minimal reset */
+/* ─── Reset ───────────────────────────────────────────────────── */
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -51,16 +73,80 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg-soft);
+  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: 16px;
-  line-height: 1.5;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Miami sunset sky — fixed full-viewport layer behind everything.
+   Layered top-to-bottom in the gradient stack (so first listed
+   sits on top): the sun, a horizon glow, and the navy→pink sky. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle 14vw at 50% 72%,
+                    rgba(255, 224, 130, 0.95) 0%,
+                    rgba(255, 168, 70, 0.85) 35%,
+                    rgba(255, 94, 58, 0.7) 60%,
+                    rgba(255, 46, 154, 0.45) 85%,
+                    transparent 100%),
+    radial-gradient(ellipse 70% 18% at 50% 72%, rgba(255, 46, 154, 0.5), transparent 75%),
+    linear-gradient(to bottom,
+                    #050524 0%,
+                    #0d0a40 28%,
+                    #2a0f58 52%,
+                    #6a1872 65%,
+                    #c81f6e 71%,
+                    #050015 72%,
+                    #050015 100%);
+  background-size: 100% 100%;
+}
+
+/* The Outrun perspective floor — a cyan grid tilted into the
+   distance, sitting in the bottom 38% of the viewport so it lines
+   up with the horizon in the sky gradient above.  The mask fades
+   the grid as it approaches the vanishing point so the lines
+   don't terminate in a hard edge. */
+body::after {
+  content: "";
+  position: fixed;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 28vh;
+  z-index: -1;
+  pointer-events: none;
+  transform: perspective(380px) rotateX(58deg);
+  transform-origin: 50% 100%;
+  background:
+    linear-gradient(to right,  rgba(0, 240, 255, 0.55) 1px, transparent 1px) 0 0 / 56px 100%,
+    linear-gradient(to bottom, rgba(255, 46, 154, 0.55) 1px, transparent 1px) 0 0 / 100% 36px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 35%, #000 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 35%, #000 100%);
 }
 
 button {
   font-family: inherit;
+}
+
+/* Default placeholder colour against the dark bg */
+::placeholder {
+  color: var(--color-muted);
+  opacity: 0.7;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text);
 }
 
 #root {

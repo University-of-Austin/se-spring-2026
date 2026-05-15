@@ -4,11 +4,16 @@
 
 .header {
   margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .name {
   margin: 0 0 var(--space-1) 0;
   font-size: var(--font-size-xl);
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  text-shadow: var(--glow-purple);
 }
 
 .bio {
@@ -25,9 +30,11 @@
 
 .postsTitle {
   margin: 0 0 var(--space-2) 0;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   color: var(--color-muted);
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .posts {

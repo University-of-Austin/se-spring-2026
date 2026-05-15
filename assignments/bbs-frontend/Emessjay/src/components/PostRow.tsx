@@ -1,31 +1,26 @@
-// One post in a list.  Whole row is clickable (navigates to detail);
-// the username inside is a separate clickable region (navigates to
-// profile, stops propagation in UserLink).
+// One post in a list.
+//
+// Accessibility: the row itself is *not* a button.  Doing so makes
+// nested-interactive HTML (a username <Link> inside a row <button>)
+// which screen readers handle poorly and HTML technically forbids.
+// Instead, the message is a real <Link> to the post detail; the
+// username is a separate <Link> in the footer.  We use :has() in CSS
+// to give the whole row a hover background when the user is over the
+// message link.
 
-import { useRouter } from "../router/useRouter";
+import { Link } from "react-router-dom";
 import type { PostOut } from "../api/types";
+import { paths } from "../router/paths";
 import { UserLink } from "./UserLink";
 import { Timestamp } from "./Timestamp";
 import styles from "./PostRow.module.css";
 
 export function PostRow({ post }: { post: PostOut }) {
-  const { navigate } = useRouter();
-
   return (
-    <article
-      className={styles.row}
-      onClick={() => navigate({ view: "post", id: post.id })}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          navigate({ view: "post", id: post.id });
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={`Post by ${post.username}: ${post.message}`}
-    >
-      <p className={styles.message}>{post.message}</p>
+    <article className={styles.row}>
+      <Link to={paths.post(post.id)} className={styles.messageLink}>
+        <p className={styles.message}>{post.message}</p>
+      </Link>
       <footer className={styles.meta}>
         <UserLink username={post.username} />
         <span className={styles.dot} aria-hidden>·</span>
