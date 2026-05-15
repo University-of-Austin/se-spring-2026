@@ -115,35 +115,81 @@ No other backend changes.
 
 ## 4. Where my agent helped most and where I had to push back
 
-*To be written after the build is complete.*
+*To finish in my own voice after I've kicked the tires myself.* Some
+notes for memory while it's fresh:
+
+- The biggest push-back was the "design" step. The agent's first instinct
+  was to propose a design system from inferred context without asking me
+  what I actually wanted. I called it out — the proposal was internally
+  coherent but built on a memorable-thing I never approved. We
+  re-scoped, did the UATX-vs-Harvard / Facebook-1.0-as-directory framing
+  conversationally, then ran /design-shotgun against UATX's real brand
+  assets and 2004 thefacebook.com archive screenshots. Variant C "The
+  Almanac" came out of that.
+- The shotgun's image-generation pipeline needed an OpenAI key I didn't
+  have configured, so I pivoted the agent to hand-code four HTML
+  mockups instead. That was actually better — real Newsreader/Antonio
+  fonts loaded from the CDN, exact hex values, real 1px hairlines.
+  Image generators garble small UI text anyway.
+- On the React side, the agent wanted to inline fetch calls into
+  components ("simpler, fewer files"). I pushed back: gold weighs code
+  organization, and a hooks/api split is the canonical React 18 / Query
+  v5 shape. The optimistic-update logic ended up in
+  `src/hooks/useCreatePost.ts` and `useToggleReaction.ts` — both fully
+  unit-testable, both used by ≥2 surfaces (Wall compose, reply
+  composer, ReactionBar in both PostCard and ReplyCard).
+- Loading + error states almost got cut for time. The assignment
+  specifically calls out that "agents are bad at this by default" so I
+  reused one States.tsx file across every fetch site rather than
+  letting each page roll its own.
 
 ## 5. Tests + Gold-tier notes
 
 ```bash
-npm test      # Vitest + RTL — runs the 3 component tests in tests/
+npm test         # Vitest + RTL — 12 tests across 3 files
+npm run test:watch
 ```
 
-Three Vitest + React Testing Library tests in `tests/components/`:
+Test files (12 tests total):
 
-1. `ComposeBox` — disables submit when empty; shows live char count; turns
-   red past 500; surfaces a server-side 422 detail inline.
-2. `PostCard` — renders message, links username, fires `onDelete` only
-   when current identity matches author.
-3. `IdentityContext` — `setUsername` persists to `localStorage`;
-   refresh-simulation restores it; invalid username (regex mismatch) is
-   rejected.
+1. `IdentityContext.test.tsx` (5) — covers the localStorage contract:
+   `setUsername` persists, refresh-simulation restores, invalid usernames
+   are rejected silently, `clear()` wipes, hook throws outside provider.
+2. `ComposeBox.test.tsx` (4) — Join-CTA when no identity; locked
+   `Dare to think. Dare to post.` placeholder; disabled-state at 0 and
+   500+ chars; Cmd+Enter triggers submit.
+3. `PostCard.test.tsx` (3) — renders body / time / username / open-thread
+   href; ReactionBar present for real posts with correct count;
+   optimistic (id < 0) posts show "posting…" and hide the bar.
 
 **Gold-item one-liners:**
-- **Visual POV:** Variant C "The Almanac" — UATX brand DNA over 2004 BBS
-  bones; see `DESIGN.md` and the locked reference at
+- **Visual POV:** Variant C "The Almanac" — UATX brand DNA (cream + antique
+  gold + Newsreader serif + Antonio condensed sans) over 2004
+  thefacebook.com bones (lowercase wordmark masthead, "my profile | my
+  friends | my privacy | logout" nav, "Wall" / "Poke" / "is online"
+  vocabulary). The thesis prints on every page: *An online directory. Not
+  a feed.* See `DESIGN.md` and the locked variant at
   `~/.gstack/projects/SoftwareEngineering/designs/wall-feed-20260515/variant-C.html`.
 - **Real-time polling:** `usePolling` wraps Query's `refetchInterval` with
-  `document.visibilityState`; "Live" pulse dot visible in the masthead.
-- **Live Thread invented UI:** `/posts/:id` page combining thread trees,
-  optimistic reply insert, polled arrival animations, and reactions with
-  viewer state.
+  `document.visibilityState` so the feed and live-thread replies poll
+  every 5s while the tab is visible and pause when it's hidden. The
+  "Live" pulse dot in the masthead shows status. Two-tab test: user A
+  posts, user B's feed/thread reflects within 5s.
+- **Live Thread invented UI:** `/posts/:id` is a coherent thread surface
+  combining `parent_id` reply tree (lazy-fetched per node on expand,
+  capped at 3 visual depth levels), optimistic reply insertion against
+  the same `useCreatePost` hook the Wall uses, polled arrivals with a
+  250ms slide-in animation for newly-detected reply IDs only, and
+  reactions inline on every node with `user_reactions` viewer state.
 
-## 6. Out of scope
+## 6. Keyboard shortcuts
+
+- `/` focuses the Wall search input
+- `?` opens the shortcut help overlay (also: a floating "?" hint bottom-right)
+- `⌘/Ctrl + Enter` posts the compose / reply textarea
+- `Esc` closes the shortcut overlay
+
+## 7. Out of scope
 
 - Adding new A2 endpoints. The contract is enough.
 - Real auth (JWT/sessions). X-Username remains "preference" per A2 README.
