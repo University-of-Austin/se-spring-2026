@@ -189,8 +189,12 @@ app.add_middleware(
 )
 ```
 
-No other A2 changes were needed — the contract held up under a real
-client.
+Also flipped `GET /posts` and `GET /users/{u}/posts` from `ORDER BY id
+ASC` to `DESC` in `queries.py`. The assignment says "newest first" but
+`verify_api.py` never asserted order, so my A2 returned the oldest first
+— a bug only the actual UI surfaced. A2's pytest suite still passes 61/61
+(none of them pinned the default sort order; the cursor tests assume ASC
+and that path is unchanged).
 
 ---
 
