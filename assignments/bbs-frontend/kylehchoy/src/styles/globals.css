@@ -1,0 +1,43 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  background: var(--cream);
+  color: var(--black);
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--gold);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Visible focus ring everywhere — never remove */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}

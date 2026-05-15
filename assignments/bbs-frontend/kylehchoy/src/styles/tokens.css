@@ -1,0 +1,67 @@
+/**
+ * Design tokens — the single source of truth for every visual value.
+ * Mirrors assignments/bbs-frontend/kylehchoy/DESIGN.md exactly.
+ * Do not introduce a value here that isn't in DESIGN.md.
+ */
+
+:root {
+  /* Color */
+  --cream: #F7F7F1;
+  --white: #FFFFFF;
+  --gold: #B89A5F;
+  --gold-light: #C2A86F;
+  --gold-tint: #EEE6D0;
+  --black: #000000;
+  --muted: #717480;
+  --hairline: #DDDDDD;
+
+  /* Type — sizes in rem (16px base) */
+  --t-xs: 0.625rem;   /* 10px — Antonio tracked, footer / dense */
+  --t-sm: 0.6875rem;  /* 11px — Antonio tracked, eyebrows / nav */
+  --t-base: 0.875rem; /* 14px — Newsreader sidebar / tagline    */
+  --t-md: 1.0625rem;  /* 17px — Newsreader post body (default)  */
+  --t-lg: 1.5rem;     /* 24px — Antonio wordmark, page titles   */
+  --t-xl: 2rem;       /* 32px — Newsreader stat numerals        */
+  --t-2xl: 2.5rem;    /* 40px — page hero (rare)                */
+
+  /* Type — families */
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-sans: 'Antonio', sans-serif;
+
+  /* Spacing — 8pt grid */
+  --s-2xs: 0.25rem;   /* 4  */
+  --s-xs: 0.5rem;     /* 8  */
+  --s-sm: 0.75rem;    /* 12 */
+  --s-md: 1rem;       /* 16 */
+  --s-lg: 1.5rem;     /* 24 */
+  --s-xl: 2rem;       /* 32 */
+  --s-2xl: 3rem;      /* 48 */
+  --s-3xl: 4rem;      /* 64 */
+
+  /* Layout */
+  --col-content: 580px;
+  --col-sidebar: 200px;
+  --col-gutter: var(--s-2xl);
+  --page-max: 860px;
+
+  /* Motion */
+  --m-fast: 150ms;
+  --m-base: 200ms;
+  --m-slow: 250ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tailwind v4 theme bridge — expose tokens as utility classes (bg-cream, text-gold, etc.) */
+@theme {
+  --color-cream: #F7F7F1;
+  --color-white: #FFFFFF;
+  --color-gold: #B89A5F;
+  --color-gold-light: #C2A86F;
+  --color-gold-tint: #EEE6D0;
+  --color-black: #000000;
+  --color-muted: #717480;
+  --color-hairline: #DDDDDD;
+
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-sans: 'Antonio', sans-serif;
+}
