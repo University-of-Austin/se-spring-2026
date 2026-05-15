@@ -6,6 +6,7 @@ import { ApiError } from '../api/types'
 import { useIdentity } from '../auth/IdentityContext'
 import { LoadingRow, ErrorBanner } from '../components/states/States'
 import { ReactionBar } from '../components/reactions/ReactionBar'
+import { ReplyTree } from '../components/thread/ReplyTree'
 import { formatRelative } from '../lib/formatTime'
 
 /**
@@ -147,9 +148,7 @@ export default function PostDetailPage() {
         </article>
       ) : null}
 
-      <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--muted)' }}>
-        Replies, reactions, and the live thread experience arrive in the next build pass.
-      </p>
+      {post ? <ReplyTree rootId={post.id} /> : null}
     </div>
   )
 }
