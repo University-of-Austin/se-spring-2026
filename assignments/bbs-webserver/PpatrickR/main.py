@@ -2,12 +2,21 @@ import re
 from datetime import datetime
 
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 
 from db import engine, init_db
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
@@ -175,7 +184,7 @@ def get_user_posts(username: str):
         rows = conn.execute(
             text(
                 "SELECT id, message, created_at, updated_at "
-                "FROM posts WHERE user_id = :uid ORDER BY created_at"
+                "FROM posts WHERE user_id = :uid ORDER BY created_at DESC, id DESC"
             ),
             {"uid": user[0]},
         ).fetchall()
@@ -238,7 +247,7 @@ def list_posts(
                 "SELECT p.id, u.username, p.message, p.created_at, p.updated_at "
                 "FROM posts p JOIN users u ON p.user_id = u.id "
                 f"{where_sql} "
-                "ORDER BY p.created_at "
+                "ORDER BY p.created_at DESC, p.id DESC "
                 "LIMIT :limit OFFSET :offset"
             ),
             params,
