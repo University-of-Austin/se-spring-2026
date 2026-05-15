@@ -40,7 +40,7 @@ npm run test:e2e   # Playwright end-to-end user-flow test
 ```
 
 - **Vitest**: 4 files, 28 assertions covering the trickiest pieces — [`apiFetch`](src/api/client.ts) error-envelope normalisation, [`useApi`](src/hooks/useApi.ts)'s stale-fetch protection, [`<Loadable>`](src/components/Loadable.tsx)'s four branches, the `usernameValidity` truth table.
-- **Playwright**: 1 spec in [`tests/e2e/user-flow.spec.ts`](tests/e2e/user-flow.spec.ts), running the full user flow (create user → sign out → switch back via dropdown → post a message → see it in the feed → click into detail → delete → verify gone). The Playwright config auto-starts both the A2 backend (via `../.venv/bin/uvicorn`) and the Vite dev server, so `npm run test:e2e` works as a single command.
+- **Playwright**: 1 spec in [`tests/e2e/user-flow.spec.ts`](tests/e2e/user-flow.spec.ts), running the full user flow (create user → sign out → switch back via dropdown → post a message → see it in the feed → click into detail → delete → verify gone). The Playwright config auto-starts both the A2 backend (via `../.venv/bin/uvicorn`) and the Vite dev server, so `npm run test:e2e` works as a single command. The e2e stack is fully isolated from dev: backend on `:8001`, frontend on `:5174`, and `BBS_DB_FILE=bbs-e2e.db` so the test never touches the real `bbs.db`. `reuseExistingServer` is `false` for both so a stray dev server can't be picked up by mistake.
 
 Silver features carried over:
 
