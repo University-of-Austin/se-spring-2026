@@ -17,10 +17,42 @@ import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
  *
  * Optimistic insertion arrives in Phase 5. For now: mutate, invalidate, clear.
  */
+/**
+ * Draft autosave key. One slot per (identity, parent) so two windows
+ * composing different threads don't clobber each other.
+ */
+function draftKey(username: string | null, parentId: number | null | undefined): string {
+  return `thenetwork.draft.${username ?? 'anon'}.${parentId ?? 'root'}`
+}
+
 export function ComposeBox({ parentId }: { parentId?: number | null }) {
   const { username } = useIdentity()
-  const [text, setText] = useState('')
+  const dKey = draftKey(username, parentId)
+  /**
+   * Compose draft autosave to localStorage. Restores on mount,
+   * persists on every keystroke (cheap; no debounce needed —
+   * localStorage writes are synchronous and fast in jsdom-sized
+   * payloads), clears on successful post. Survives accidental
+   * navigation, refresh, and tab close.
+   */
+  const [text, setText] = useState<string>(() => {
+    try {
+      return localStorage.getItem(dKey) ?? ''
+    } catch {
+      return ''
+    }
+  })
   const [serverError, setServerError] = useState<string | null>(null)
+
+  // Persist draft on every change.
+  useEffect(() => {
+    try {
+      if (text) localStorage.setItem(dKey, text)
+      else localStorage.removeItem(dKey)
+    } catch {
+      /* quota / private mode — silently ignore */
+    }
+  }, [text, dKey])
 
   const mut = useCreatePost()
   // Idempotency key for the current compose-intent. Stays stable across
@@ -37,6 +69,7 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
       {
         onSuccess: () => {
           setText('')
+          try { localStorage.removeItem(dKey) } catch { /* ignore */ }
           idemKeyRef.current = newIdempotencyKey()
         },
         onError: (err) => {
@@ -111,6 +144,7 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
         }}
       >
         {parentId ? 'Reply' : 'Compose'}
+        <span aria-hidden="true" style={{ color: 'var(--hairline)' }}> · ⌘↵ to post · draft saved</span>
       </label>
 
       <textarea
@@ -161,6 +195,7 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
         <button
           type="submit"
           disabled={disabled}
+          aria-keyshortcuts="Meta+Enter Control+Enter"
           style={{
             background: disabled ? 'var(--hairline)' : 'var(--gold)',
             color: 'var(--white)',
@@ -173,7 +208,7 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
             cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
-          {mut.isPending ? 'Posting…' : 'Post'}
+          {mut.isPending ? 'Posting…' : 'Post · ⌘↵'}
         </button>
       </div>
 

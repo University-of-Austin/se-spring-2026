@@ -29,20 +29,22 @@ describe('ComposeBox', () => {
   it('renders the textarea + Post button when identity is set, with the locked placeholder', () => {
     localStorage.setItem('thenetwork.username', 'kyle_choy')
     renderCompose()
-    const textarea = screen.getByLabelText('Compose') as HTMLTextAreaElement
+    const textarea = screen.getByLabelText(/^Compose/) as HTMLTextAreaElement
     expect(textarea).toBeInTheDocument()
     expect(textarea.placeholder).toBe('Dare to think. Dare to post.')
-    expect(screen.getByRole('button', { name: /^post$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^post/i })).toBeDisabled()
   })
 
   it('keeps the submit disabled at length 0 and over 500 chars; live char count shows red when over', async () => {
     localStorage.setItem('thenetwork.username', 'kyle_choy')
     const u = userEvent.setup()
     renderCompose()
-    const textarea = screen.getByLabelText('Compose')
-    const submit = screen.getByRole('button', { name: /^post$/i })
+    const textarea = screen.getByLabelText(/^Compose/)
+    const submit = screen.getByRole('button', { name: /^post/i })
 
-    // Empty → disabled
+    // Empty → disabled (NB: draft autosave restores from localStorage,
+    // so make sure the input starts empty for this test).
+    expect((textarea as HTMLTextAreaElement).value).toBe('')
     expect(submit).toBeDisabled()
 
     // 1 char → enabled
@@ -75,7 +77,7 @@ describe('ComposeBox', () => {
       }),
     )
     renderCompose()
-    const textarea = screen.getByLabelText('Compose')
+    const textarea = screen.getByLabelText(/^Compose/)
     await u.type(textarea, 'hi')
     await u.keyboard('{Meta>}{Enter}{/Meta}')
     expect(fetchMock).toHaveBeenCalled()

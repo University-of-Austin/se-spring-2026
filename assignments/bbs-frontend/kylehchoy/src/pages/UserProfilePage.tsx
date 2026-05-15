@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getUser, getUserPosts } from '../api/users'
+import { getUser } from '../api/users'
+import { listPosts } from '../api/posts'
 import { ApiError } from '../api/types'
 import { useIdentity } from '../auth/IdentityContext'
 import { PostCard } from '../components/feed/PostCard'
@@ -22,11 +23,19 @@ export default function UserProfilePage() {
     },
   })
 
+  /**
+   * Uses A2's silver `?username=` filter on GET /posts instead of the
+   * /users/{u}/posts shortcut. Gives us the same data plus cursor
+   * pagination, which lines up with the Wall's "Load more" pattern,
+   * and leaves room to compose with ?q= later for "search this user's
+   * posts". Documented in README §3 (design decisions).
+   */
   const postsQ = useQuery({
-    queryKey: ['user', username, 'posts'],
-    queryFn: () => getUserPosts(username, 50, 0),
+    queryKey: ['posts', { username }],
+    queryFn: () => listPosts({ username, limit: 50 }),
     enabled: userQ.isSuccess,
   })
+  const userPosts = postsQ.data?.posts ?? []
 
   // 404 view
   if (userQ.isError && userQ.error instanceof ApiError && userQ.error.status === 404) {
@@ -86,10 +95,10 @@ export default function UserProfilePage() {
             {postsQ.isError ? (
               <ErrorBanner error={postsQ.error} onRetry={() => void postsQ.refetch()} />
             ) : null}
-            {postsQ.data && postsQ.data.length === 0 ? (
+            {postsQ.data && userPosts.length === 0 ? (
               <EmptyState title="No posts yet" />
             ) : null}
-            {postsQ.data?.map((p, i) => <PostCard key={p.id} post={p} isFirst={i === 0} />)}
+            {userPosts.map((p, i) => <PostCard key={p.id} post={p} isFirst={i === 0} />)}
           </>
         ) : null}
       </main>
