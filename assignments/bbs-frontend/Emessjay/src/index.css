@@ -1,0 +1,68 @@
+/* Design tokens.  Every other stylesheet pulls from these custom
+   properties — change a value here and the whole UI follows.
+   This is also where a future dark-mode gold-tier feature would
+   live: redeclare the colors inside an @media or [data-theme] block. */
+
+:root {
+  /* Surface colors */
+  --color-bg: #ffffff;
+  --color-bg-soft: #f6f7f9;
+  --color-bg-hover: #f1f3f5;
+  --color-border: #e3e6ea;
+
+  /* Text colors */
+  --color-text: #1a1d21;
+  --color-muted: #6b7280;
+
+  /* Accent (a calm blue-violet, not the React/Vite defaults) */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+
+  /* Danger (form errors, delete confirmations) */
+  --color-danger: #dc2626;
+  --color-danger-text: #991b1b;
+  --color-danger-bg: #fee2e2;
+
+  /* Spacing ladder — geometric-ish, easy to memorise */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.5rem;
+
+  /* Type scale — three sizes, no more */
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+
+  --radius: 6px;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Minimal reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-soft);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+#root {
+  isolation: isolate;
+}

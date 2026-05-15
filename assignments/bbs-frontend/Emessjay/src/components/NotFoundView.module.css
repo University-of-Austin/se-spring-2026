@@ -1,0 +1,28 @@
+.wrap {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-xl);
+}
+
+.body {
+  margin: 0 0 var(--space-4) 0;
+  color: var(--color-muted);
+}
+
+.button {
+  background: var(--color-accent);
+  color: white;
+  border: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-accent-hover);
+}
