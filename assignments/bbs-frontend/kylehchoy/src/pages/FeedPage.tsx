@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listPosts } from '../api/posts'
 import type { ListPostsResponse, Post } from '../api/types'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { usePolling } from '../hooks/usePolling'
 import { ComposeBox } from '../components/feed/ComposeBox'
 import { PostCard } from '../components/feed/PostCard'
 import { FeedSidebar } from '../components/feed/Sidebar'
@@ -24,6 +25,11 @@ export default function FeedPage() {
     }
   }, [debouncedQuery])
 
+  // Poll the top of the feed only — once the user has paged into older
+  // posts (cursor != null), pause polling to avoid clobbering scroll.
+  const refetchInterval = usePolling(5000)
+  const shouldPoll = cursor === null && !debouncedQuery
+
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<ListPostsResponse>({
     queryKey: ['posts', { q: debouncedQuery, cursor }],
     queryFn: () =>
@@ -33,6 +39,8 @@ export default function FeedPage() {
         cursor: debouncedQuery ? undefined : cursor ?? undefined,
         limit: 25,
       }),
+    refetchInterval: shouldPoll ? refetchInterval : false,
+    refetchIntervalInBackground: false,
   })
 
   // Merge cursor-paginated pages into accumulated.

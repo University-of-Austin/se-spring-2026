@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useIdentity } from '../../auth/IdentityContext'
+import { LiveDot } from './LiveDot'
 
 /**
  * Masthead: gold bar across the top.
@@ -39,19 +40,22 @@ export function MastheadHeader() {
         color: 'var(--white)',
       }}
     >
-      <Link
-        to="/"
-        style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 24,
-          fontWeight: 500,
-          textDecoration: 'none',
-          color: 'var(--white)',
-          letterSpacing: '-0.005em',
-        }}
-      >
-        thenetwork
-      </Link>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Link
+          to="/"
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 24,
+            fontWeight: 500,
+            textDecoration: 'none',
+            color: 'var(--white)',
+            letterSpacing: '-0.005em',
+          }}
+        >
+          thenetwork
+        </Link>
+        <LiveDot />
+      </span>
 
       <nav
         aria-label="Primary"
