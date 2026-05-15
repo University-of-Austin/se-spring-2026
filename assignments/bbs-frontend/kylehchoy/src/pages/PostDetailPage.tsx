@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getPostWithEtag, invalidatePostEtag, deletePost } from '../api/posts'
 import type { Post } from '../api/types'
 import { ApiError } from '../api/types'
-import { useIdentity } from '../auth/IdentityContext'
+import { useIdentity } from '../auth/useIdentity'
 import { LoadingRow, ErrorBanner } from '../components/states/States'
 import { ReactionBar } from '../components/reactions/ReactionBar'
 import { ReplyTree } from '../components/thread/ReplyTree'
@@ -22,7 +22,11 @@ export default function PostDetailPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { username } = useIdentity()
+  // All hook calls must be unconditional; do not move below the 404
+  // early return. React's hook contract requires identical call order
+  // on every render, and a 404 response toggles whether we return early.
   const [confirming, setConfirming] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   /**
    * Conditional GET via A2's weak ETag on /posts/{id}. The first call
@@ -60,7 +64,16 @@ export default function PostDetailPage() {
   const deleteMut = useMutation({
     mutationFn: () => deletePost(postId),
     onSuccess: () => {
+      // Tear down every cache entry that referenced the deleted post.
+      // Without this, staleTime: 30_000 (queryClient.ts) keeps the
+      // ghost row around — revisiting /posts/:id within 30s would show
+      // the deleted content because Query treats the cache as fresh.
+      qc.removeQueries({ queryKey: ['post', postId] })
+      qc.removeQueries({ queryKey: ['post', postId, 'replies'] })
+      qc.removeQueries({ queryKey: ['post', postId, 'reactions'] })
+      invalidatePostEtag(postId)
       qc.invalidateQueries({ queryKey: ['posts'] })
+      qc.invalidateQueries({ queryKey: ['user'] })
       navigate('/', { replace: true })
     },
   })
@@ -81,7 +94,6 @@ export default function PostDetailPage() {
 
   const post = postQ.data
   const isAuthor = post && username && post.username === username
-  const [editing, setEditing] = useState(false)
   const onDelete = () => {
     if (!confirming) {
       setConfirming(true)

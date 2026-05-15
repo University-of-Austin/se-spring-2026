@@ -17,16 +17,9 @@ import { test, expect, type Page } from '@playwright/test'
  * "X-Username is preference, not auth" semantics).
  */
 test.describe('thenetwork — full user flow', () => {
-  let username: string
-  let postBody: string
+  test('create → post → see → delete', async ({ page }, testInfo) => {
+    const { username, postBody } = makeScenario(testInfo.title)
 
-  test.beforeEach(({}, testInfo) => {
-    // RFC: ^[a-zA-Z0-9_]{3,20}$ — base36 timestamp keeps us inside.
-    username = `e2e_${Date.now().toString(36)}`
-    postBody = `End-to-end smoke ${testInfo.title} ${Date.now()}`
-  })
-
-  test('create → post → see → delete', async ({ page }) => {
     // 0. Land on the Wall.
     await page.goto('/')
     await expect(page.getByRole('link', { name: 'thenetwork' })).toBeVisible()
@@ -77,7 +70,9 @@ test.describe('thenetwork — full user flow', () => {
     await expect(page.getByText(postBody, { exact: true })).toHaveCount(0)
   })
 
-  test('edit own post then see edited badge', async ({ page }) => {
+  test('edit own post then see edited badge', async ({ page }, testInfo) => {
+    const { username, postBody } = makeScenario(testInfo.title)
+
     // 1. New identity + new post.
     await createUserAndIdentity(page, username)
     await composePost(page, postBody)
@@ -116,6 +111,15 @@ test.describe('thenetwork — full user flow', () => {
     await page.getByRole('button', { name: /confirm delete/i }).click()
   })
 })
+
+function makeScenario(title: string) {
+  // RFC: ^[a-zA-Z0-9_]{3,20}$ — base36 timestamp keeps us inside.
+  const username = `e2e_${Date.now().toString(36).slice(-8)}_${Math.random().toString(36).slice(2, 5)}`
+  return {
+    username,
+    postBody: `End-to-end smoke ${title} ${Date.now()}`,
+  }
+}
 
 async function createUserAndIdentity(page: Page, username: string) {
   await page.goto('/signup')

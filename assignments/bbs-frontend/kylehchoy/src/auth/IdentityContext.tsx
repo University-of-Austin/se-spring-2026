@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -9,16 +7,9 @@ import {
 } from 'react'
 import { setIdentity as setApiIdentity } from '../api/client'
 import { isValidUsername } from '../lib/validation'
+import { IdentityContext, type IdentityValue } from './identityValue'
 
 const STORAGE_KEY = 'thenetwork.username'
-
-interface IdentityValue {
-  username: string | null
-  setUsername: (next: string | null) => void
-  clear: () => void
-}
-
-const IdentityContext = createContext<IdentityValue | null>(null)
 
 function readStorage(): string | null {
   try {
@@ -64,12 +55,4 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   )
 
   return <IdentityContext.Provider value={value}>{children}</IdentityContext.Provider>
-}
-
-export function useIdentity(): IdentityValue {
-  const ctx = useContext(IdentityContext)
-  if (!ctx) {
-    throw new Error('useIdentity must be used inside <IdentityProvider>')
-  }
-  return ctx
 }

@@ -2,7 +2,7 @@ import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/types'
 import { useCreatePost, newIdempotencyKey } from '../../hooks/useCreatePost'
-import { useIdentity } from '../../auth/IdentityContext'
+import { useIdentity } from '../../auth/useIdentity'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
 /**

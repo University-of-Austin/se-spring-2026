@@ -47,6 +47,20 @@ header[data-shell="masthead"] :focus-visible {
   outline-color: #ffffff;
 }
 
+header[data-shell="masthead"] {
+  min-width: 0;
+}
+
+[data-masthead="brand"],
+[data-masthead="nav"] {
+  min-width: 0;
+}
+
+[data-masthead="nav"] {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* Skip link — visually hidden until focused, then jumps to main content. */
 .skip-link {
   position: absolute;
@@ -82,6 +96,34 @@ header[data-shell="masthead"] :focus-visible {
   [data-shell="two-col"] {
     padding-left: 16px !important;
     padding-right: 16px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  header[data-shell="masthead"] {
+    height: auto !important;
+    min-height: 40px;
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 6px 16px !important;
+  }
+
+  [data-masthead="brand"] {
+    flex: 1 1 140px;
+  }
+
+  [data-masthead="nav"] {
+    flex: 1 1 100%;
+    justify-content: flex-start !important;
+    gap: 6px 14px !important;
+    font-size: 10px !important;
+    line-height: 1.1;
+  }
+
+  [data-masthead="nav"] a,
+  [data-masthead="nav"] button {
+    font-size: 10px !important;
   }
 }
 

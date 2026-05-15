@@ -16,8 +16,10 @@ interface Vars {
 
 interface Ctx {
   prev: ReactionsResponse | undefined
+  prevSinglePost: Post | undefined
   prevPostCaches: Array<[unknown, ListPostsResponse | undefined]>
   prevReplyCaches: Array<[unknown, Post[] | undefined]>
+  prevUserPostCaches: Array<[unknown, Post[] | undefined]>
 }
 
 /**
@@ -49,6 +51,23 @@ export function useToggleReaction() {
           counts: nextCounts,
           total: Math.max(0, prev.total + delta),
           user_reactions: nextViewer,
+        })
+      }
+
+      // Patch the single-post detail cache (['post', id]) so the
+      // ReactionBar on PostDetailPage shows the new count immediately.
+      // Without this, the bar reads post.reaction_counts straight from
+      // the ['post', id] payload and never sees the bump until
+      // refetch — viewer state flips (from reactions cache) but the
+      // visible count stays stale.
+      const prevSinglePost = qc.getQueryData<Post>(['post', postId])
+      if (prevSinglePost) {
+        qc.setQueryData<Post>(['post', postId], {
+          ...prevSinglePost,
+          reaction_counts: {
+            ...prevSinglePost.reaction_counts,
+            [kind]: Math.max(0, prevSinglePost.reaction_counts[kind] + delta),
+          },
         })
       }
 
@@ -91,7 +110,27 @@ export function useToggleReaction() {
         qc.setQueryData(key as unknown[], next)
       }
 
-      return { prev, prevPostCaches, prevReplyCaches }
+      const prevUserPostCaches = qc.getQueriesData<Post[]>({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === 'user' && q.queryKey[2] === 'posts',
+      })
+      for (const [key, value] of prevUserPostCaches) {
+        if (!value) continue
+        const idx = value.findIndex((p) => p.id === postId)
+        if (idx < 0) continue
+        const next = [...value]
+        const p = next[idx]
+        next[idx] = {
+          ...p,
+          reaction_counts: {
+            ...p.reaction_counts,
+            [kind]: Math.max(0, p.reaction_counts[kind] + delta),
+          },
+        }
+        qc.setQueryData(key as unknown[], next)
+      }
+
+      return { prev, prevSinglePost, prevPostCaches, prevReplyCaches, prevUserPostCaches }
     },
 
     onError: (_err, _vars, ctx) => {
@@ -99,8 +138,12 @@ export function useToggleReaction() {
       if (ctx.prev !== undefined) {
         qc.setQueryData(['post', _vars.postId, 'reactions'], ctx.prev)
       }
+      if (ctx.prevSinglePost !== undefined) {
+        qc.setQueryData(['post', _vars.postId], ctx.prevSinglePost)
+      }
       for (const [key, value] of ctx.prevPostCaches) qc.setQueryData(key as unknown[], value)
       for (const [key, value] of ctx.prevReplyCaches) qc.setQueryData(key as unknown[], value)
+      for (const [key, value] of ctx.prevUserPostCaches) qc.setQueryData(key as unknown[], value)
     },
 
     onSettled: (_data, _err, { postId }) => {

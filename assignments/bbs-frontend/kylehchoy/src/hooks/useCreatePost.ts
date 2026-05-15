@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createPost, type CreatePostBody } from '../api/posts'
 import type { ListPostsResponse, Post } from '../api/types'
-import { useIdentity } from '../auth/IdentityContext'
+import { useIdentity } from '../auth/useIdentity'
 
 interface Vars {
   body: CreatePostBody
@@ -12,7 +12,7 @@ interface Vars {
 
 interface RootCtx {
   prevPages: Array<[unknown, ListPostsResponse | undefined]>
-  tempId: number
+  prevReplies?: Post[] | undefined
 }
 
 /**
@@ -103,25 +103,33 @@ export function useCreatePost() {
         })
       }
 
+      let prevReplies: Post[] | undefined
       if (body.parent_id != null) {
         const replyKey = ['post', body.parent_id, 'replies']
         await qc.cancelQueries({ queryKey: replyKey })
-        const prev = qc.getQueryData<Post[]>(replyKey)
-        if (prev) qc.setQueryData<Post[]>(replyKey, [...prev, temp])
+        prevReplies = qc.getQueryData<Post[]>(replyKey)
+        if (prevReplies) qc.setQueryData<Post[]>(replyKey, [...prevReplies, temp])
       }
 
-      return { prevPages, tempId }
+      return { prevPages, prevReplies }
     },
 
-    onError: (_err, _vars, ctx) => {
+    onError: (_err, vars, ctx) => {
       if (!ctx) return
       for (const [key, value] of ctx.prevPages) {
         qc.setQueryData(key as unknown[], value)
+      }
+      if (vars.body.parent_id != null) {
+        qc.setQueryData(['post', vars.body.parent_id, 'replies'], ctx.prevReplies)
       }
     },
 
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ['posts'] })
+      if (username) {
+        qc.invalidateQueries({ queryKey: ['user', username] })
+        qc.invalidateQueries({ queryKey: ['user', username, 'posts'] })
+      }
       if (vars.body.parent_id != null) {
         qc.invalidateQueries({ queryKey: ['post', vars.body.parent_id, 'replies'] })
         qc.invalidateQueries({ queryKey: ['post', vars.body.parent_id] })

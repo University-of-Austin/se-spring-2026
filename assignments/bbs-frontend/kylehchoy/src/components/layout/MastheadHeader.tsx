@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useIdentity } from '../../auth/IdentityContext'
+import { useIdentity } from '../../auth/useIdentity'
 import { LiveDot } from './LiveDot'
 
 /**
@@ -41,7 +41,7 @@ export function MastheadHeader() {
         color: 'var(--white)',
       }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <span data-masthead="brand" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <Link
           to="/"
           style={{
@@ -60,6 +60,7 @@ export function MastheadHeader() {
 
       <nav
         aria-label="Primary"
+        data-masthead="nav"
         style={{
           display: 'flex',
           gap: 22,

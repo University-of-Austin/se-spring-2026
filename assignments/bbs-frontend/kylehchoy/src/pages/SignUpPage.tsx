@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { createUser, listUsers } from '../api/users'
 import { ApiError } from '../api/types'
-import { useIdentity } from '../auth/IdentityContext'
+import { useIdentity } from '../auth/useIdentity'
 import { USERNAME_MAX, USERNAME_MIN, isValidUsername } from '../lib/validation'
 import { ErrorBanner } from '../components/states/States'
 

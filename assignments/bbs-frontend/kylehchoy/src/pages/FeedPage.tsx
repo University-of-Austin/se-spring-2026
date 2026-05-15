@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useCallback, useRef, useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { listPosts } from '../api/posts'
 import type { ListPostsResponse, Post } from '../api/types'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -15,8 +15,9 @@ type TopWindow = 24 | 168 | 720 // hours: 24h / 7d / 30d
 
 export default function FeedPage() {
   const [query, setQuery] = useState('')
-  const [cursor, setCursor] = useState<string | null>(null)
-  const [accumulated, setAccumulated] = useState<Post[]>([])
+  const [loadedPosts, setLoadedPosts] = useState<Post[]>([])
+  const [hasLoadedMore, setHasLoadedMore] = useState(false)
+  const [loadedNextCursor, setLoadedNextCursor] = useState<string | null>(null)
   const [sort, setSort] = useState<SortMode>('recent')
   const [topWindow, setTopWindow] = useState<TopWindow>(24)
   const debouncedQuery = useDebouncedValue(query, 300)
@@ -28,38 +29,27 @@ export default function FeedPage() {
   }, [])
   useKeyboardShortcut('/', focusSearch)
 
-  // Reset cursor when switching sort modes — A2 returns 422 on
-  // sort=top + cursor (bm25 rank isn't monotonic).
-  useEffect(() => {
-    setCursor(null)
-    setAccumulated([])
-  }, [sort, topWindow])
-
-  // Reset accumulation when search changes (search uses offset, not cursor).
-  const prevQ = useRef(debouncedQuery)
-  useEffect(() => {
-    if (prevQ.current !== debouncedQuery) {
-      setAccumulated([])
-      setCursor(null)
-      prevQ.current = debouncedQuery
-    }
-  }, [debouncedQuery])
+  const resetPaging = useCallback(() => {
+    setLoadedPosts([])
+    setHasLoadedMore(false)
+    setLoadedNextCursor(null)
+  }, [])
 
   // Poll the top of the feed only — once the user has paged into older
-  // posts (cursor != null), pause polling to avoid clobbering scroll.
+  // posts, pause polling to avoid clobbering scroll.
   // Sort=top also pauses polling because trending output is meant to
   // be a snapshot, not a live stream.
   const refetchInterval = usePolling(5000)
-  const shouldPoll = sort === 'recent' && cursor === null && !debouncedQuery
+  const isCursorFeed = sort === 'recent' && !debouncedQuery
+  const shouldPoll = isCursorFeed && !hasLoadedMore
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<ListPostsResponse>({
-    queryKey: ['posts', { q: debouncedQuery, cursor, sort, window: topWindow }],
+    queryKey: ['posts', { q: debouncedQuery, sort, window: topWindow }],
     queryFn: () =>
       listPosts({
         q: debouncedQuery || undefined,
         // A2 rejects cursor + q (422) and cursor + sort=top (422).
-        // Use offset path when searching or sorting by top.
-        cursor: debouncedQuery || sort === 'top' ? undefined : cursor ?? undefined,
+        // The first page never sends a cursor; Load more does.
         sort: sort === 'top' ? 'top' : undefined,
         window: sort === 'top' ? topWindow : undefined,
         limit: 25,
@@ -68,34 +58,45 @@ export default function FeedPage() {
     refetchIntervalInBackground: false,
   })
 
-  // Merge cursor-paginated pages into accumulated. Only for the
-  // recent/no-search path — search and trending return their own
-  // fresh list every fetch.
-  useEffect(() => {
-    if (!data || debouncedQuery || sort === 'top') return
-    if (cursor === null) {
-      setAccumulated(data.posts)
-    } else {
-      setAccumulated((prev) => {
-        const seen = new Set(prev.map((p) => p.id))
-        const merged = [...prev]
-        for (const p of data.posts) if (!seen.has(p.id)) merged.push(p)
-        return merged
-      })
-    }
-  }, [data, debouncedQuery, cursor, sort])
+  const loadMore = useMutation({
+    mutationFn: (cursor: string) => listPosts({ cursor, limit: 25 }),
+    onSuccess: (nextPage) => {
+      setLoadedPosts((prev) => mergePosts(prev, nextPage.posts))
+      setLoadedNextCursor(nextPage.next_cursor)
+      setHasLoadedMore(true)
+    },
+  })
 
-  const displayed = debouncedQuery || sort === 'top' ? data?.posts ?? [] : accumulated
+  const firstPage = data?.posts ?? []
+  const displayed = isCursorFeed ? mergePosts(firstPage, loadedPosts) : firstPage
+  const loadCursor = isCursorFeed
+    ? hasLoadedMore
+      ? loadedNextCursor
+      : data?.next_cursor ?? null
+    : null
 
   return (
     <div style={wrap} data-shell="two-col">
       <main>
-        <SearchBox value={query} onChange={setQuery} inputRef={searchRef} />
+        <SearchBox
+          value={query}
+          onChange={(next) => {
+            setQuery(next)
+            resetPaging()
+          }}
+          inputRef={searchRef}
+        />
         <SortBar
           sort={sort}
-          onSortChange={setSort}
+          onSortChange={(next) => {
+            setSort(next)
+            resetPaging()
+          }}
           topWindow={topWindow}
-          onWindowChange={setTopWindow}
+          onWindowChange={(next) => {
+            setTopWindow(next)
+            resetPaging()
+          }}
         />
 
         <ComposeBox />
@@ -108,6 +109,7 @@ export default function FeedPage() {
         ) : null}
 
         {isError ? <ErrorBanner error={error} onRetry={() => void refetch()} /> : null}
+        {loadMore.isError ? <ErrorBanner error={loadMore.error} /> : null}
 
         {!isLoading && !isError && displayed.length === 0 ? (
           <EmptyState title="No posts on the Wall yet">
@@ -119,15 +121,15 @@ export default function FeedPage() {
           <PostCard key={p.id} post={p} isFirst={i === 0} />
         ))}
 
-        {!debouncedQuery && sort === 'recent' && data?.next_cursor ? (
+        {loadCursor ? (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <button
               type="button"
-              onClick={() => setCursor(data.next_cursor)}
-              disabled={isFetching}
+              onClick={() => loadMore.mutate(loadCursor)}
+              disabled={isFetching || loadMore.isPending}
               style={loadMoreBtn}
             >
-              {isFetching ? 'Loading…' : 'Load more'}
+              {loadMore.isPending ? 'Loading…' : 'Load more'}
             </button>
           </div>
         ) : null}
@@ -136,6 +138,17 @@ export default function FeedPage() {
       <FeedSidebar />
     </div>
   )
+}
+
+function mergePosts(primary: Post[], secondary: Post[]): Post[] {
+  const seen = new Set<number>()
+  const merged: Post[] = []
+  for (const post of [...primary, ...secondary]) {
+    if (seen.has(post.id)) continue
+    seen.add(post.id)
+    merged.push(post)
+  }
+  return merged
 }
 
 function SortBar({

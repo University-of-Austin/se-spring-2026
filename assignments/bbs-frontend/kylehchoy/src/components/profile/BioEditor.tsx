@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { patchBio } from '../../api/users'
 import type { User } from '../../api/types'
@@ -15,9 +15,13 @@ export function BioEditor({ user }: { user: User }) {
   const [draft, setDraft] = useState(user.bio ?? '')
   const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!editing) setDraft(user.bio ?? '')
-  }, [user.bio, editing])
+  // Enter edit mode and seed the draft from the current bio at that
+  // moment. Avoids a setState-in-effect for the same purpose.
+  const beginEdit = () => {
+    setDraft(user.bio ?? '')
+    setErr(null)
+    setEditing(true)
+  }
 
   const mut = useMutation({
     mutationFn: () => patchBio(user.username, draft.trim() === '' ? null : draft),
@@ -41,7 +45,7 @@ export function BioEditor({ user }: { user: User }) {
             No bio yet.
           </p>
         )}
-        <button type="button" onClick={() => setEditing(true)} style={editBtn}>
+        <button type="button" onClick={beginEdit} style={editBtn}>
           {user.bio ? 'Edit bio' : 'Add a bio'}
         </button>
       </div>

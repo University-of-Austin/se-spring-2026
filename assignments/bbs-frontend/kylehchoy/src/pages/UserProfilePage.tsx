@@ -1,9 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getUser } from '../api/users'
-import { listPosts } from '../api/posts'
+import { getUser, getUserPosts } from '../api/users'
 import { ApiError } from '../api/types'
-import { useIdentity } from '../auth/IdentityContext'
+import { useIdentity } from '../auth/useIdentity'
 import { PostCard } from '../components/feed/PostCard'
 import { BioEditor } from '../components/profile/BioEditor'
 import { LoadingRow, ErrorBanner, EmptyState } from '../components/states/States'
@@ -23,19 +22,12 @@ export default function UserProfilePage() {
     },
   })
 
-  /**
-   * Uses A2's silver `?username=` filter on GET /posts instead of the
-   * /users/{u}/posts shortcut. Gives us the same data plus cursor
-   * pagination, which lines up with the Wall's "Load more" pattern,
-   * and leaves room to compose with ?q= later for "search this user's
-   * posts". Documented in README §3 (design decisions).
-   */
   const postsQ = useQuery({
-    queryKey: ['posts', { username }],
-    queryFn: () => listPosts({ username, limit: 50 }),
+    queryKey: ['user', username, 'posts'],
+    queryFn: () => getUserPosts(username, 50, 0),
     enabled: userQ.isSuccess,
   })
-  const userPosts = postsQ.data?.posts ?? []
+  const userPosts = postsQ.data ?? []
 
   // 404 view
   if (userQ.isError && userQ.error instanceof ApiError && userQ.error.status === 404) {

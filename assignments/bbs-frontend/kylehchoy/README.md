@@ -60,7 +60,7 @@ No other backend changes.
 
 ## 2. Tier targeted
 
-**Gold.** Three of the four gold criteria, done well rather than four flat:
+**Gold.** All four gold criteria:
 
 1. **Visual design with a point of view** — the 2004-college-BBS-via-UATX
    thesis, executed under a documented design system (`DESIGN.md`). Variant
@@ -75,8 +75,10 @@ No other backend changes.
    reply insert + animated arrivals under poll + reactions with viewer
    state (`user_reactions` from A2 `GET /posts/{id}/reactions`). A single
    coherent interaction surface, not three bolt-ons.
-
-(Playwright E2E was scoped as stretch — see "out of scope" below.)
+4. **Automated E2E proof** — Playwright drives the core user path against
+   the real frontend and backend: create a user, switch identity through
+   signup, post to the Wall, see the post in the feed, delete it, and
+   verify the edit marker does not appear on a fresh post.
 
 ## 3. Design decisions
 
@@ -90,14 +92,14 @@ No other backend changes.
 - **Routing in URLs, not in conditional renders.** `react-router-dom` v7
   with `/`, `/users`, `/users/:username`, `/posts/:id`, `/signup`. Every
   view is bookmarkable, the browser back/forward button does the right
-  thing, and the Live Thread page persists collapse state in
-  `?collapse=12,17` so a refresh doesn't blow it away.
+  thing, and refresh lands back on the same page instead of dumping the
+  user to the Wall.
 - **Optimistic updates for two mutations only.** Compose-post and
   reaction-toggle. Both use Query's `onMutate` → snapshot → `onError`
   rollback pattern; on success, invalidate the cached query. Negative IDs
-  (`-Date.now()`) for temp posts to avoid collision with server IDs. Every
-  other mutation (create user, delete post) is non-optimistic because the
-  user benefit is not worth the rollback surface area.
+  (`-Date.now()`) for temp posts avoid collision with server IDs. Profile
+  pages use A2's `GET /users/{username}/posts` endpoint directly, so edits
+  and reactions patch both feed caches and profile post caches.
 - **Polling, not push, for real-time.** Visibility-aware
   `refetchInterval` (5s focused, paused blurred). SSE would require
   backend lifecycle changes I am intentionally not making — A2 is graded
@@ -115,8 +117,10 @@ No other backend changes.
 
 ## 4. Where my agent helped most and where I had to push back
 
-*To finish in my own voice after I've kicked the tires myself.* Some
-notes for memory while it's fresh:
+The agent helped most with converting the product direction into repeatable
+React structure, cache behavior, and tests. I had to push back hardest on
+design premise, fetch organization, and the boring-but-graded loading/error
+coverage.
 
 - The biggest push-back was the "design" step. The agent's first instinct
   was to propose a design system from inferred context without asking me
@@ -146,11 +150,12 @@ notes for memory while it's fresh:
 ## 5. Tests + Gold-tier notes
 
 ```bash
-npm test         # Vitest + RTL — 12 tests across 3 files
+npm test         # Vitest + RTL — 13 tests across 4 files
+npm run test:e2e # Playwright — real frontend/backend user flow
 npm run test:watch
 ```
 
-Test files (12 tests total):
+Test files (15 tests total):
 
 1. `IdentityContext.test.tsx` (5) — covers the localStorage contract:
    `setUsername` persists, refresh-simulation restores, invalid usernames
@@ -161,6 +166,11 @@ Test files (12 tests total):
 3. `PostCard.test.tsx` (3) — renders body / time / username / open-thread
    href; ReactionBar present for real posts with correct count;
    optimistic (id < 0) posts show "posting…" and hide the bar.
+4. `UseCreatePost.test.tsx` (1) — regression coverage for optimistic
+   reply rollback when the create request fails.
+5. `tests/e2e/full-flow.spec.ts` (2) — Playwright creates a user, switches
+   identity through signup, creates a Wall post, verifies feed visibility,
+   deletes it, and verifies fresh posts do not show an edited badge.
 
 **Gold-item one-liners:**
 - **Visual POV:** Variant C "The Almanac" — UATX brand DNA (cream + antique
@@ -179,8 +189,11 @@ Test files (12 tests total):
   combining `parent_id` reply tree (lazy-fetched per node on expand,
   capped at 3 visual depth levels), optimistic reply insertion against
   the same `useCreatePost` hook the Wall uses, polled arrivals with a
-  250ms slide-in animation for newly-detected reply IDs only, and
+  250ms slide-in animation as replies mount from initial fetch or polling, and
   reactions inline on every node with `user_reactions` viewer state.
+- **Automated E2E:** `npm run test:e2e` proves the required create / switch /
+  post / see / delete path against the real app rather than a mocked unit
+  surface.
 
 ## 6. Keyboard shortcuts
 
@@ -196,5 +209,3 @@ Test files (12 tests total):
 - Server-sent events / websockets. Polling is sufficient.
 - Multi-user presence ("alice is typing").
 - A native mobile shell. Responsive web only.
-- Playwright end-to-end spec (scoped as stretch; deferred unless Phases
-  0–9 close ahead of schedule).

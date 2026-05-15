@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getReactions } from '../../api/posts'
 import { REACTION_KINDS, type Post, type ReactionKind } from '../../api/types'
 import { useToggleReaction } from '../../hooks/useToggleReaction'
-import { useIdentity } from '../../auth/IdentityContext'
+import { useIdentity } from '../../auth/useIdentity'
 
 /**
  * Inline reaction strip on the post card / thread view.

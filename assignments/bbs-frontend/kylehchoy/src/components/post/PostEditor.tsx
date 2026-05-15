@@ -59,10 +59,24 @@ export function PostEditor({
         qc.setQueryData(key as unknown[], next)
       }
 
+      const userPostCaches = qc.getQueriesData<Post[]>({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === 'user' && q.queryKey[2] === 'posts',
+      })
+      for (const [key, value] of userPostCaches) {
+        if (!value) continue
+        const idx = value.findIndex((p) => p.id === updated.id)
+        if (idx < 0) continue
+        const next = [...value]
+        next[idx] = updated
+        qc.setQueryData(key as unknown[], next)
+      }
+
       // Still invalidate so the server's canonical state lands on the
       // next focus / poll cycle. Cheap insurance against caches the
       // walk above didn't catch.
       qc.invalidateQueries({ queryKey: ['posts'] })
+      qc.invalidateQueries({ queryKey: ['user', updated.username, 'posts'] })
       onDone()
     },
     onError: (e) => setErr(e instanceof ApiError ? e.message : String(e)),

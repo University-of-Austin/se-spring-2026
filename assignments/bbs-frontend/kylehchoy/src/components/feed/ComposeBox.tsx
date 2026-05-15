@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, type FormEvent, type KeyboardEvent } from 
 import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/types'
 import { useCreatePost, newIdempotencyKey } from '../../hooks/useCreatePost'
-import { useIdentity } from '../../auth/IdentityContext'
+import { useIdentity } from '../../auth/useIdentity'
 import { MESSAGE_MAX, isValidMessage } from '../../lib/validation'
 
 /**
@@ -79,12 +79,6 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
     )
   }
 
-  // Clear stale server error when the user edits.
-  useEffect(() => {
-    if (serverError) setServerError(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text])
-
   if (!username) {
     return (
       <div
@@ -150,7 +144,12 @@ export function ComposeBox({ parentId }: { parentId?: number | null }) {
       <textarea
         id={`compose-${parentId ?? 'root'}`}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value)
+          // Clear any stale server error at the event source so we
+          // don't need a setState-in-effect to keep them in sync.
+          if (serverError) setServerError(null)
+        }}
         onKeyDown={onKeyDown}
         placeholder="Dare to think. Dare to post."
         rows={3}

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listUsers } from '../../api/users'
-import { useIdentity } from '../../auth/IdentityContext'
+import { useIdentity } from '../../auth/useIdentity'
 import { TrendingWidget } from './TrendingWidget'
 
 /**

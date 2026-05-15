@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { listReplies } from '../../api/posts'
 import { usePolling } from '../../hooks/usePolling'
@@ -8,8 +7,8 @@ import { ReplyComposer } from './ReplyComposer'
 
 /**
  * Top-level replies under a root post. Polled every 5s when visible.
- * Diffs against the previous fetch so new replies get a one-shot
- * "arrive" animation — the polled-live feel.
+ * Each ReplyCard animates on mount. Existing replies keep stable keys,
+ * so a polling refetch only animates replies that actually arrived.
  */
 export function ReplyTree({ rootId }: { rootId: number }) {
   const refetchInterval = usePolling(5000)
@@ -19,24 +18,6 @@ export function ReplyTree({ rootId }: { rootId: number }) {
     refetchInterval,
     refetchIntervalInBackground: false,
   })
-
-  // Track which IDs are new since the previous render so we can apply
-  // the arrival animation just once per ID.
-  const seen = useRef<Set<number>>(new Set())
-  const arrived = useRef<Set<number>>(new Set())
-  useEffect(() => {
-    if (!data) return
-    const next = new Set<number>()
-    const newlyArrived = new Set<number>()
-    for (const r of data) {
-      if (!seen.current.has(r.id) && seen.current.size > 0) {
-        newlyArrived.add(r.id)
-      }
-      next.add(r.id)
-    }
-    seen.current = next
-    arrived.current = newlyArrived
-  }, [data])
 
   return (
     <section aria-label="Replies">
@@ -56,7 +37,7 @@ export function ReplyTree({ rootId }: { rootId: number }) {
       {data && data.length > 0 ? (
         <ul style={list}>
           {data.map((r) => (
-            <ReplyCard key={r.id} post={r} isNew={arrived.current.has(r.id)} />
+            <ReplyCard key={r.id} post={r} isNew />
           ))}
         </ul>
       ) : null}

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ApiError } from '../../api/types'
+import { describe } from './describe'
 
 /**
  * Loading skeleton — three faint serif lines.
@@ -104,13 +104,6 @@ const retryBtn: React.CSSProperties = {
   border: '1px solid var(--gold)',
   padding: '5px 12px',
   cursor: 'pointer',
-}
-
-export function describe(error: unknown): string {
-  if (error instanceof ApiError) return error.message
-  if (error instanceof Error) return error.message
-  if (typeof error === 'string') return error
-  return 'Unknown error.'
 }
 
 /**

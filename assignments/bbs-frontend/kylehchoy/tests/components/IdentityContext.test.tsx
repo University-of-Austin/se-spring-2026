@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { act, render, renderHook } from '@testing-library/react'
-import { IdentityProvider, useIdentity } from '../../src/auth/IdentityContext'
+import { IdentityProvider } from '../../src/auth/IdentityContext'
+import { useIdentity } from '../../src/auth/useIdentity'
 
 function wrap({ children }: { children: React.ReactNode }) {
   return <IdentityProvider>{children}</IdentityProvider>
