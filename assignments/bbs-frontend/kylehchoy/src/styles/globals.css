@@ -42,6 +42,31 @@ button {
   outline-offset: 2px;
 }
 
+/* Gold-on-gold is invisible. Inside the masthead bar, use white. */
+header[data-shell="masthead"] :focus-visible {
+  outline-color: #ffffff;
+}
+
+/* Skip link — visually hidden until focused, then jumps to main content. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  background: var(--black);
+  color: var(--white);
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  z-index: 300;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 8px;
+}
+
 /* Responsive: collapse two-column page layouts at narrow widths.
    FeedPage and UserProfilePage use `display: grid` with two columns
    of 580px + 200px; below 880px we drop the sidebar beneath content.

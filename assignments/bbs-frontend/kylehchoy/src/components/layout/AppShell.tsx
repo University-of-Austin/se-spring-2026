@@ -12,9 +12,14 @@ import { ShortcutOverlay } from './ShortcutOverlay'
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <>
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <MastheadHeader />
       <Tagline />
-      <main>{children}</main>
+      <main id="main" tabIndex={-1}>
+        {children}
+      </main>
       <FooterThesis />
       <ShortcutOverlay />
     </>

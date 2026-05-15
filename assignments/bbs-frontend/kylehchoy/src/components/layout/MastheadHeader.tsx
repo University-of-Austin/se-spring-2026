@@ -30,6 +30,7 @@ export function MastheadHeader() {
 
   return (
     <header
+      data-shell="masthead"
       style={{
         background: 'var(--gold)',
         height: 40,
