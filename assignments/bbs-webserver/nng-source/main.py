@@ -383,7 +383,7 @@ def logout(authorization: Optional[str] = Header(default=None, alias="Authorizat
 def list_users():
     with engine.connect() as conn:
         rows = conn.execute(
-            text("SELECT id, username, created_at, bio FROM users ORDER BY id")
+            text("SELECT id, username, created_at, bio, avatar FROM users ORDER BY id")
         ).fetchall()
         return [user_to_dict(conn, r) for r in rows]
 
