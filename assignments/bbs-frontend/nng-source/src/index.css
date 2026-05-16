@@ -551,6 +551,107 @@ textarea { resize: vertical; min-height: 70px; }
   font-size: var(--fs-xs);
 }
 
+/* ---- Floating Action Button + Compose modal ------------------------- */
+
+.compose-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 300;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  transition: transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.compose-fab:hover {
+  background: var(--accent-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4);
+}
+.compose-fab:active { transform: translateY(0); }
+.compose-fab:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.compose-fab > span {
+  /* nudge the + glyph up so it's optically centered */
+  position: relative;
+  top: -2px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 16px 32px;
+  z-index: 100;
+  animation: modal-fade 0.12s ease-out;
+}
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-width: 560px;
+  animation: modal-slide 0.16s ease-out;
+}
+@keyframes modal-slide {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap-sm) var(--gap);
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  font-size: 24px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.modal-close:hover { background: var(--bg-hover); color: var(--fg); }
+.modal-close:focus-visible { outline: 2px solid var(--accent); }
+
+.compose-modal .compose {
+  margin: 0;
+  border: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+@media (max-width: 540px) {
+  .compose-fab { right: 16px; bottom: 16px; width: 52px; height: 52px; }
+  .modal-backdrop { padding: 32px 12px; }
+}
+
 /* ---- Compose: image attach ------------------------------------------- */
 
 .compose-footer-actions { display: flex; align-items: center; gap: var(--gap-sm); }

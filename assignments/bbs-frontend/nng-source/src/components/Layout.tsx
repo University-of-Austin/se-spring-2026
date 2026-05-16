@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
+import { ComposeModal } from "./ComposeModal";
 
 const UNREAD_POLL_MS = 30000;
 
@@ -10,8 +11,13 @@ export function Layout() {
   const { username, token, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
   const [unreadDMs, setUnreadDMs] = useState(0);
+  const [composeOpen, setComposeOpen] = useState(false);
+
+  // Board from the URL, if any -- so the FAB posts into the active board.
+  const activeBoard = location.pathname === "/" ? (searchParams.get("board") ?? "") : "";
 
   // Fetch current user's avatar so the header chip shows it. Re-runs whenever
   // the logged-in username changes (login / logout / switch user).
@@ -55,8 +61,7 @@ export function Layout() {
 
   // Global keyboard shortcuts:
   //   "/"  -> focus search box on feed
-  //   "n"  -> focus compose textarea (Cmd+Enter to submit handled in Compose)
-  //   "?"  -> open shortcuts dialog (footer link)
+  //   "n"  -> open the compose modal (Cmd+Enter inside it submits)
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       // Ignore when typing in a form field.
@@ -69,13 +74,14 @@ export function Layout() {
         const search = document.getElementById("feed-search") as HTMLInputElement | null;
         search?.focus();
       } else if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (!username) return;
         e.preventDefault();
-        window.dispatchEvent(new CustomEvent("bbs:focus-compose"));
+        setComposeOpen(true);
       }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [username]);
 
   async function onLogout() {
     await logout();
@@ -135,6 +141,24 @@ export function Layout() {
       <footer className="app-footer">
         <span>Shortcuts: <kbd>/</kbd> search · <kbd>n</kbd> compose · <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> post</span>
       </footer>
+
+      {username && (
+        <button
+          type="button"
+          className="compose-fab"
+          onClick={() => setComposeOpen(true)}
+          aria-label="New post"
+          title="New post (n)"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
+      )}
+      {composeOpen && username && (
+        <ComposeModal
+          board={activeBoard || undefined}
+          onClose={() => setComposeOpen(false)}
+        />
+      )}
     </div>
   );
 }

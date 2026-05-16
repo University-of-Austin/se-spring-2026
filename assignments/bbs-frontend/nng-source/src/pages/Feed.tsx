@@ -3,7 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { useBlockedBoards } from "../blockedBoards";
-import { Compose } from "../components/Compose";
 import { ErrorBox } from "../components/ErrorBox";
 import { PostCard } from "../components/PostCard";
 import { Spinner } from "../components/Spinner";
@@ -119,27 +118,47 @@ export function Feed() {
     return () => clearInterval(id);
   }, [q, board, loading, error]);
 
-  // ---- optimistic post handlers passed to Compose -------------------------
-  function onOptimisticAdd(p: Post) {
-    setPosts((prev) => [p, ...prev]);
-    setOptimisticIds((s) => new Set(s).add(p.id));
-  }
-  function onConfirm(placeholderId: number, real: Post) {
-    setPosts((prev) => prev.map((p) => (p.id === placeholderId ? real : p)));
-    setOptimisticIds((s) => {
-      const n = new Set(s);
-      n.delete(placeholderId);
-      return n;
-    });
-  }
-  function onRollback(placeholderId: number) {
-    setPosts((prev) => prev.filter((p) => p.id !== placeholderId));
-    setOptimisticIds((s) => {
-      const n = new Set(s);
-      n.delete(placeholderId);
-      return n;
-    });
-  }
+  // ---- optimistic-post events emitted by the global ComposeModal ---------
+  // Compose lives in the FAB modal mounted by Layout. It dispatches custom
+  // events for each phase of a post; we sync our local state in response.
+  useEffect(() => {
+    function onAdd(e: Event) {
+      const post = (e as CustomEvent<{ post: Post }>).detail.post;
+      // If the user is currently filtering, only show the placeholder when
+      // the new post would match that filter -- otherwise it looks like it
+      // vanished.
+      if (board && post.board !== board) return;
+      if (q && !post.message.toLowerCase().includes(q.toLowerCase())) return;
+      setPosts((prev) => [post, ...prev]);
+      setOptimisticIds((s) => new Set(s).add(post.id));
+    }
+    function onConfirm(e: Event) {
+      const { placeholderId, post } = (e as CustomEvent<{ placeholderId: number; post: Post }>).detail;
+      setPosts((prev) => prev.map((p) => (p.id === placeholderId ? post : p)));
+      setOptimisticIds((s) => {
+        const n = new Set(s);
+        n.delete(placeholderId);
+        return n;
+      });
+    }
+    function onRollback(e: Event) {
+      const { placeholderId } = (e as CustomEvent<{ placeholderId: number }>).detail;
+      setPosts((prev) => prev.filter((p) => p.id !== placeholderId));
+      setOptimisticIds((s) => {
+        const n = new Set(s);
+        n.delete(placeholderId);
+        return n;
+      });
+    }
+    window.addEventListener("bbs:post-optimistic", onAdd);
+    window.addEventListener("bbs:post-confirmed", onConfirm);
+    window.addEventListener("bbs:post-rollback", onRollback);
+    return () => {
+      window.removeEventListener("bbs:post-optimistic", onAdd);
+      window.removeEventListener("bbs:post-confirmed", onConfirm);
+      window.removeEventListener("bbs:post-rollback", onRollback);
+    };
+  }, [board, q]);
 
   // ---- delete handler (uses optimistic removal + rollback) ----------------
   async function onDelete(id: number) {
@@ -239,17 +258,6 @@ export function Feed() {
             Manage in settings
           </Link>
         </div>
-      )}
-
-      {username && (
-        <section aria-label="Compose">
-          <Compose
-            board={board || undefined}
-            onOptimisticAdd={onOptimisticAdd}
-            onConfirm={onConfirm}
-            onRollback={onRollback}
-          />
-        </section>
       )}
 
       {newCount > 0 && (
