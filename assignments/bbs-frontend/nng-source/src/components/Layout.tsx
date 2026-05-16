@@ -46,6 +46,7 @@ export function Layout() {
           </Link>
           <nav className="primary-nav" aria-label="Primary">
             <NavLink to="/" end>Feed</NavLink>
+            <NavLink to="/boards">Boards</NavLink>
             <NavLink to="/users">Users</NavLink>
           </nav>
           <div className="auth-status">

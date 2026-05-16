@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth";
-import type { Post } from "../types";
+import type { Board, Post } from "../types";
 import { api } from "../api";
 
 const MAX_LEN = 500;
+const BOARD_RE = /^[a-z0-9_-]+$/;
+const BOARD_MAX = 30;
 
 interface ComposeProps {
   onOptimisticAdd: (placeholder: Post) => void;
   onConfirm: (placeholderId: number, real: Post) => void;
   onRollback: (placeholderId: number) => void;
+  /** If set, the board is locked (we're inside a board context). */
   board?: string;
 }
 
@@ -17,9 +20,21 @@ let placeholderCounter = -1;
 export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: ComposeProps) {
   const { username, token } = useAuth();
   const [text, setText] = useState("");
+  const [boardInput, setBoardInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [boards, setBoards] = useState<Board[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch board names for the autocomplete datalist. Cheap, runs once on mount.
+  // If it fails we just don't show suggestions; the input is still free-text.
+  useEffect(() => {
+    let cancelled = false;
+    api.listBoards()
+      .then((bs) => { if (!cancelled) setBoards(bs); })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Cmd/Ctrl+Enter to submit
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -50,7 +65,14 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
   const trimmed = text.trim();
   const isEmpty = trimmed.length === 0;
   const tooLong = text.length > MAX_LEN;
-  const disabled = submitting || isEmpty || tooLong;
+
+  // Board: if locked by URL context, use that. Otherwise validate the input.
+  const effectiveBoard = board || boardInput.trim().toLowerCase();
+  const boardSpecified = effectiveBoard.length > 0;
+  const boardInvalid =
+    boardSpecified && (!BOARD_RE.test(effectiveBoard) || effectiveBoard.length > BOARD_MAX);
+
+  const disabled = submitting || isEmpty || tooLong || boardInvalid;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,11 +80,12 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
     setSubmitting(true);
     setError(null);
 
+    const targetBoard = effectiveBoard || "general";
     const placeholderId = placeholderCounter--;
     const optimistic: Post = {
       id: placeholderId,
       username: username!,
-      board: board || "general",
+      board: targetBoard,
       message: trimmed,
       created_at: new Date().toISOString(),
       updated_at: null,
@@ -71,12 +94,16 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
     setText("");
 
     try {
-      const real = await api.createPost(trimmed, username!, token!, board);
+      const real = await api.createPost(
+        trimmed,
+        username!,
+        token!,
+        effectiveBoard || undefined,
+      );
       onConfirm(placeholderId, real);
     } catch (err) {
       onRollback(placeholderId);
       setError(err instanceof Error ? err.message : "Could not post.");
-      // restore the draft so the user doesn't lose what they typed
       setText(trimmed);
     } finally {
       setSubmitting(false);
@@ -87,6 +114,42 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
 
   return (
     <form onSubmit={handleSubmit} className="compose" aria-label="Compose a new post">
+      <div className="compose-header">
+        {board ? (
+          <span className="compose-board-locked">
+            Posting to <strong>#{board}</strong>
+          </span>
+        ) : (
+          <>
+            <label htmlFor="compose-board" className="compose-board-label">
+              Board
+            </label>
+            <input
+              id="compose-board"
+              type="text"
+              className="compose-board-input"
+              list="compose-board-options"
+              placeholder="general"
+              value={boardInput}
+              onChange={(e) => setBoardInput(e.target.value)}
+              maxLength={BOARD_MAX}
+              autoComplete="off"
+              aria-invalid={boardInvalid}
+              aria-describedby="compose-board-hint"
+            />
+            <datalist id="compose-board-options">
+              {boards.map((b) => (
+                <option key={b.name} value={b.name} />
+              ))}
+            </datalist>
+            <small id="compose-board-hint" className="hint">
+              lowercase letters, digits, <code>_</code> or <code>-</code>; up to 30 chars.
+              Defaults to <code>general</code>.
+            </small>
+          </>
+        )}
+      </div>
+
       <label htmlFor="compose-textarea" className="visually-hidden">Message</label>
       <textarea
         id="compose-textarea"
@@ -112,6 +175,11 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
           {submitting ? "Posting..." : "Post"}
         </button>
       </div>
+      {boardInvalid && (
+        <div role="alert" className="inline-error">
+          Board name must be lowercase letters, digits, <code>_</code>, or <code>-</code>.
+        </div>
+      )}
       {error && (
         <div id="compose-error" role="alert" className="inline-error">
           {error}

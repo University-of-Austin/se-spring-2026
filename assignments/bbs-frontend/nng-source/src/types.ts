@@ -24,6 +24,7 @@ export interface LoginResponse {
 export interface Board {
   name: string;
   created_at: string;
+  post_count: number;
 }
 
 // A 422 from FastAPI looks like {"detail": [...]} (Pydantic validation errors)

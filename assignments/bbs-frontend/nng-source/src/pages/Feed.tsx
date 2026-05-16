@@ -15,6 +15,7 @@ export function Feed() {
   const { username, token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
+  const board = searchParams.get("board") ?? "";
 
   // Local input state so typing doesn't fire a request per keystroke.
   // We sync URL on submit/blur.
@@ -36,7 +37,7 @@ export function Feed() {
     setError(null);
     setNewCount(0);
     try {
-      const data = await api.listPosts({ q: q || undefined, limit: PAGE_SIZE, offset: 0 });
+      const data = await api.listPosts({ q: q || undefined, board: board || undefined, limit: PAGE_SIZE, offset: 0 });
       setPosts(data);
       setHasMore(data.length === PAGE_SIZE);
     } catch (err) {
@@ -44,7 +45,7 @@ export function Feed() {
     } finally {
       setLoading(false);
     }
-  }, [q]);
+  }, [q, board]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -57,7 +58,12 @@ export function Feed() {
         .reduce<number | null>((acc, p) => (acc === null || p.id < acc ? p.id : acc), null);
       // Use offset = number of confirmed (non-optimistic) posts already loaded.
       const offset = posts.filter((p) => p.id > 0).length;
-      const more = await api.listPosts({ q: q || undefined, limit: PAGE_SIZE, offset });
+      const more = await api.listPosts({
+        q: q || undefined,
+        board: board || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      });
       if (more.length === 0) {
         setHasMore(false);
       } else {
@@ -88,7 +94,7 @@ export function Feed() {
       if (document.hidden) return;          // pause when tab is backgrounded
       isPolling.current = true;
       try {
-        const head = await api.listPosts({ q: q || undefined, limit: PAGE_SIZE, offset: 0 });
+        const head = await api.listPosts({ q: q || undefined, board: board || undefined, limit: PAGE_SIZE, offset: 0 });
         setPosts((prev) => {
           const knownIds = new Set(prev.filter((p) => p.id > 0).map((p) => p.id));
           const fresh = head.filter((p) => !knownIds.has(p.id));
@@ -109,7 +115,7 @@ export function Feed() {
       finally { isPolling.current = false; }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [q, loading, error]);
+  }, [q, board, loading, error]);
 
   // ---- optimistic post handlers passed to Compose -------------------------
   function onOptimisticAdd(p: Post) {
@@ -148,7 +154,16 @@ export function Feed() {
 
   function onSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSearchParams(searchInput ? { q: searchInput } : {}, { replace: false });
+    const next: Record<string, string> = {};
+    if (searchInput) next.q = searchInput;
+    if (board) next.board = board;
+    setSearchParams(next, { replace: false });
+  }
+
+  function clearBoard() {
+    const next: Record<string, string> = {};
+    if (q) next.q = q;
+    setSearchParams(next);
   }
 
   return (
@@ -168,7 +183,11 @@ export function Feed() {
             <button
               type="button"
               className="btn btn-link"
-              onClick={() => setSearchParams({})}
+              onClick={() => {
+                const next: Record<string, string> = {};
+                if (board) next.board = board;
+                setSearchParams(next);
+              }}
             >
               Clear
             </button>
@@ -177,9 +196,21 @@ export function Feed() {
         {q && <p className="feed-search-context">Showing results for <em>"{q}"</em></p>}
       </section>
 
+      {board && (
+        <div className="board-context" role="status">
+          <span>
+            Filtering by board: <strong>#{board}</strong>
+          </span>
+          <button type="button" className="btn btn-link btn-sm" onClick={clearBoard}>
+            Show all boards
+          </button>
+        </div>
+      )}
+
       {username && (
         <section aria-label="Compose">
           <Compose
+            board={board || undefined}
             onOptimisticAdd={onOptimisticAdd}
             onConfirm={onConfirm}
             onRollback={onRollback}

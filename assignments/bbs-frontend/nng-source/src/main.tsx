@@ -10,6 +10,7 @@ import { Profile } from "./pages/Profile";
 import { PostDetail } from "./pages/PostDetail";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
+import { Boards } from "./pages/Boards";
 
 const router = createBrowserRouter([
   {
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
       { index: true, element: <Feed /> },
       { path: "users", element: <Users /> },
       { path: "users/:username", element: <Profile /> },
+      { path: "boards", element: <Boards /> },
       { path: "posts/:id", element: <PostDetail /> },
       { path: "login", element: <Login /> },
       { path: "signup", element: <Signup /> },

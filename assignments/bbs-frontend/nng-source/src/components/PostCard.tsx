@@ -31,8 +31,13 @@ export function PostCard({
           {" · "}
           <time dateTime={post.created_at}>{formatTimestamp(post.created_at)}</time>
           {post.updated_at && <span className="post-edited"> · edited</span>}
-          {post.board && post.board !== "general" && (
-            <span className="post-board"> · {post.board}</span>
+          {post.board && (
+            <>
+              {" · "}
+              <Link to={`/?board=${encodeURIComponent(post.board)}`} className="post-board">
+                #{post.board}
+              </Link>
+            </>
           )}
         </span>
       </header>

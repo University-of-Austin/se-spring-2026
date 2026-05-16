@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { Compose } from "../src/components/Compose";
@@ -7,6 +7,10 @@ import { AuthProvider } from "../src/auth";
 // Mock the api module so Compose's submit doesn't hit a real server.
 vi.mock("../src/api", () => ({
   api: {
+    listBoards: vi.fn(async () => [
+      { name: "general", created_at: "2026-05-01T00:00:00", post_count: 12 },
+      { name: "random",  created_at: "2026-05-02T00:00:00", post_count: 3 },
+    ]),
     createPost: vi.fn(async (msg: string) => ({
       id: 999,
       username: "alice",
@@ -94,8 +98,12 @@ describe("Compose", () => {
     expect(placeholder.message).toBe("hi there");
     expect(placeholder.id).toBeLessThan(0);
 
-    // Confirmation happens after the mocked api resolves
-    await screen.findByDisplayValue("");  // textarea cleared
+    // Confirmation happens after the mocked api resolves -- wait for the
+    // message textarea to clear (not the board input, which is also empty).
+    await waitFor(() => {
+      const ta = screen.getByLabelText("Message") as HTMLTextAreaElement;
+      expect(ta.value).toBe("");
+    });
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onRollback).not.toHaveBeenCalled();
   });
