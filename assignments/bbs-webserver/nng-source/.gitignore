@@ -1,0 +1,12 @@
+# Runtime artifacts
+bbs.db
+__pycache__/
+*.pyc
+
+# User-uploaded content (server-managed)
+static/avatars/
+static/post-images/
+
+# Venv if anyone makes one inline
+.venv/
+venv/
