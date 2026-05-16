@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -88,6 +89,18 @@ def resolve_session(conn, authorization: Optional[str]):
 # Disable FastAPI's built-in /docs and /redoc so we can wrap them with our own
 # nav strip (so every page can link to every other page).
 app = FastAPI(title="BBS Webserver", docs_url=None, redoc_url=None)
+
+# CORS: allow the A4 frontend (Vite dev server on :5173) to talk to us from the
+# browser. Without this, browsers block cross-origin fetches even though curl
+# and verify_api.py still work. See A4 README for the full story.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
