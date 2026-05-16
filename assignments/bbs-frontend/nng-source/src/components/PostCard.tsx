@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Post } from "../types";
+import { Avatar } from "./Avatar";
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
@@ -24,7 +25,8 @@ export function PostCard({
     <article className={`post-card ${optimistic ? "post-card-optimistic" : ""}`} aria-busy={optimistic}>
       <header className="post-card-header">
         <Link to={`/users/${encodeURIComponent(post.username)}`} className="post-username">
-          {post.username}
+          <Avatar username={post.username} src={post.avatar_url} size="sm" />
+          <span>{post.username}</span>
         </Link>
         <span className="post-meta">
           <Link to={`/posts/${post.id}`} className="post-id-link">#{post.id}</Link>

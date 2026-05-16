@@ -114,7 +114,20 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
 
   return (
     <form onSubmit={handleSubmit} className="compose" aria-label="Compose a new post">
-      <div className="compose-header">
+      <label htmlFor="compose-textarea" className="visually-hidden">Message</label>
+      <textarea
+        id="compose-textarea"
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder="What's on your mind? (Cmd/Ctrl+Enter to post)"
+        rows={3}
+        aria-describedby="compose-count compose-error"
+        aria-invalid={tooLong}
+      />
+
+      <div className="compose-board-row">
         {board ? (
           <span className="compose-board-locked">
             Posting to <strong>#{board}</strong>
@@ -135,33 +148,15 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
               maxLength={BOARD_MAX}
               autoComplete="off"
               aria-invalid={boardInvalid}
-              aria-describedby="compose-board-hint"
             />
             <datalist id="compose-board-options">
               {boards.map((b) => (
                 <option key={b.name} value={b.name} />
               ))}
             </datalist>
-            <small id="compose-board-hint" className="hint">
-              lowercase letters, digits, <code>_</code> or <code>-</code>; up to 30 chars.
-              Defaults to <code>general</code>.
-            </small>
           </>
         )}
       </div>
-
-      <label htmlFor="compose-textarea" className="visually-hidden">Message</label>
-      <textarea
-        id="compose-textarea"
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="What's on your mind? (Cmd/Ctrl+Enter to post)"
-        rows={3}
-        aria-describedby="compose-count compose-error"
-        aria-invalid={tooLong}
-      />
       <div className="compose-footer">
         <span id="compose-count" className={countClass} aria-live="polite">
           {text.length} / {MAX_LEN}

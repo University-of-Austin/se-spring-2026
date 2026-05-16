@@ -427,14 +427,12 @@ textarea { resize: vertical; min-height: 70px; }
 .board-name { font-weight: 600; color: var(--accent); }
 .board-meta { color: var(--fg-dim); font-size: var(--fs-xs); }
 
-/* Compose board picker */
-.compose-header {
+/* Compose board picker: horizontal row beneath the textarea */
+.compose-board-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: var(--gap-sm);
-  padding-bottom: var(--gap-sm);
-  border-bottom: 1px solid var(--border-soft);
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-top: var(--gap-sm);
 }
 .compose-board-label {
   font-size: var(--fs-xs);
@@ -442,16 +440,93 @@ textarea { resize: vertical; min-height: 70px; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin: 0;
 }
 .compose-board-input {
   font-family: var(--font-mono);
-  max-width: 280px;
+  font-size: var(--fs-xs);
+  max-width: 200px;
+  padding: 3px 8px;
+  line-height: 1.3;
 }
 .compose-board-locked {
   font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
 .compose-board-locked strong { color: var(--accent); }
+
+/* ---- Avatars --------------------------------------------------------- */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  user-select: none;
+  line-height: 1;
+}
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-initial { display: block; }
+
+.avatar-xs { width: 18px; height: 18px; font-size: 10px; }
+.avatar-sm { width: 24px; height: 24px; font-size: 12px; }
+.avatar-md { width: 36px; height: 36px; font-size: 16px; }
+.avatar-lg { width: 56px; height: 56px; font-size: 22px; }
+.avatar-xl { width: 96px; height: 96px; font-size: 36px; }
+
+/* Header chip: keep username + avatar aligned */
+.auth-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* PostCard: avatar + name inline */
+.post-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* User list rows: avatar + name on one side, post count on the other */
+.user-list-item a {
+  align-items: center;
+}
+.user-list-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Profile header: big avatar on the left, name+meta stacked on the right */
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+.profile-identity-text { flex: 1; }
+.profile-username { margin: 0 0 4px; }
+
+.avatar-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+.avatar-editor-actions {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+.avatar-editor-error {
+  max-width: 280px;
+  font-size: var(--fs-xs);
+}
 
 @media (max-width: 540px) {
   :root { --gap: 12px; --gap-lg: 18px; }
@@ -462,4 +537,5 @@ textarea { resize: vertical; min-height: 70px; }
   .post-card-header { flex-direction: column; gap: 2px; }
   .board-list { grid-template-columns: 1fr; }
   .board-context { flex-direction: column; align-items: flex-start; }
+  .profile-identity { flex-direction: column; align-items: flex-start; text-align: left; }
 }

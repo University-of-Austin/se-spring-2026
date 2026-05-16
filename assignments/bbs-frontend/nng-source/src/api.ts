@@ -78,6 +78,16 @@ function extractDetail(payload: unknown): string {
   return "";
 }
 
+/**
+ * Resolve a backend-relative path (e.g. "/static/avatars/3.png") to a full URL.
+ * Returns null unchanged so components can short-circuit cleanly.
+ */
+export function resolveBackendUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${BASE_URL}${path.startsWith("/") ? path : "/" + path}`;
+}
+
 // ------------------------ Endpoints --------------------------------------
 
 export const api = {
@@ -123,6 +133,35 @@ export const api = {
     }),
   deletePost: (id: number, token: string) =>
     request<void>(`/posts/${id}`, { method: "DELETE", token }),
+
+  // ---- avatars ----
+  uploadAvatar: async (username: string, file: File, token: string): Promise<User> => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(
+      `${BASE_URL}/users/${encodeURIComponent(username)}/avatar`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      },
+    );
+    const text = await res.text();
+    let payload: unknown = null;
+    if (text) {
+      try { payload = JSON.parse(text); } catch { payload = text; }
+    }
+    if (!res.ok) {
+      throw new ApiError(extractDetail(payload) || `${res.status} ${res.statusText}`, res.status);
+    }
+    return payload as User;
+  },
+
+  deleteAvatar: (username: string, token: string) =>
+    request<User>(`/users/${encodeURIComponent(username)}/avatar`, {
+      method: "DELETE",
+      token,
+    }),
 
   // ---- boards ----
   listBoards: () => request<Board[]>("/boards"),

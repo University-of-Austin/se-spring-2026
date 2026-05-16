@@ -5,6 +5,7 @@ export interface User {
   created_at: string;
   bio: string | null;
   post_count: number;
+  avatar_url: string | null;
 }
 
 export interface Post {
@@ -14,6 +15,7 @@ export interface Post {
   message: string;
   created_at: string;
   updated_at: string | null;
+  avatar_url: string | null;
 }
 
 export interface LoginResponse {

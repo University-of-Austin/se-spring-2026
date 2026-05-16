@@ -1,10 +1,35 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import { api } from "../api";
+import { Avatar } from "./Avatar";
 
 export function Layout() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
+  const [myAvatar, setMyAvatar] = useState<string | null>(null);
+
+  // Fetch current user's avatar so the header chip shows it. Re-runs whenever
+  // the logged-in username changes (login / logout / switch user).
+  useEffect(() => {
+    if (!username) { setMyAvatar(null); return; }
+    let cancelled = false;
+    api.getUser(username)
+      .then((u) => { if (!cancelled) setMyAvatar(u.avatar_url); })
+      .catch(() => { /* ignore -- fallback initial renders fine */ });
+    return () => { cancelled = true; };
+  }, [username]);
+
+  // Listen for avatar-change events from Profile so the header updates
+  // without waiting for a navigation.
+  useEffect(() => {
+    function onAvatarChange(e: Event) {
+      const detail = (e as CustomEvent<{ avatar_url: string | null }>).detail;
+      setMyAvatar(detail?.avatar_url ?? null);
+    }
+    window.addEventListener("bbs:avatar-changed", onAvatarChange);
+    return () => window.removeEventListener("bbs:avatar-changed", onAvatarChange);
+  }, []);
 
   // Global keyboard shortcuts:
   //   "/"  -> focus search box on feed
@@ -53,7 +78,8 @@ export function Layout() {
             {username ? (
               <>
                 <Link to={`/users/${encodeURIComponent(username)}`} className="auth-username">
-                  {username}
+                  <Avatar username={username} src={myAvatar} size="sm" />
+                  <span>{username}</span>
                 </Link>
                 <button type="button" onClick={onLogout} className="btn btn-link">
                   Log out
