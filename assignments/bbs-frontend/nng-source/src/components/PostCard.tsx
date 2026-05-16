@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { resolveBackendUrl } from "../api";
 import type { Post } from "../types";
 import { Avatar } from "./Avatar";
 
@@ -44,6 +45,22 @@ export function PostCard({
         </span>
       </header>
       <p className="post-message">{post.message}</p>
+      {post.image_url && (
+        <a
+          href={resolveBackendUrl(post.image_url) ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="post-image-link"
+          aria-label="Open attached image in a new tab"
+        >
+          <img
+            src={resolveBackendUrl(post.image_url) ?? post.image_url}
+            alt=""
+            className="post-image"
+            loading="lazy"
+          />
+        </a>
+      )}
       {showDelete && !optimistic && onDelete && (
         <div className="post-actions">
           <button

@@ -11,6 +11,9 @@ import { PostDetail } from "./pages/PostDetail";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { Boards } from "./pages/Boards";
+import { DMs } from "./pages/DMs";
+import { DMThread } from "./pages/DMThread";
+import { Settings } from "./pages/Settings";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +25,9 @@ const router = createBrowserRouter([
       { path: "users/:username", element: <Profile /> },
       { path: "boards", element: <Boards /> },
       { path: "posts/:id", element: <PostDetail /> },
+      { path: "dms", element: <DMs /> },
+      { path: "dms/:username", element: <DMThread /> },
+      { path: "settings", element: <Settings /> },
       { path: "login", element: <Login /> },
       { path: "signup", element: <Signup /> },
       {

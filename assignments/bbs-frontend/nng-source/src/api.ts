@@ -1,4 +1,13 @@
-import { ApiError, type Board, type LoginResponse, type Post, type User } from "./types";
+import {
+  ApiError,
+  type Board,
+  type DMConversation,
+  type DMMessage,
+  type DMThread,
+  type LoginResponse,
+  type Post,
+  type User,
+} from "./types";
 
 const BASE_URL = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
@@ -84,7 +93,8 @@ function extractDetail(payload: unknown): string {
  */
 export function resolveBackendUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path;
+  // Already absolute or a browser-internal URL? Pass through unchanged.
+  if (/^(https?:|blob:|data:)/i.test(path)) return path;
   return `${BASE_URL}${path.startsWith("/") ? path : "/" + path}`;
 }
 
@@ -119,18 +129,36 @@ export const api = {
   listPosts: (opts?: { q?: string; username?: string; board?: string; limit?: number; offset?: number }) =>
     request<Post[]>("/posts", { query: opts }),
   getPost: (id: number) => request<Post>(`/posts/${id}`),
-  createPost: (
+  createPost: async (
     message: string,
     username: string,
     token: string,
-    board?: string,
-  ) =>
-    request<Post>("/posts", {
+    opts?: { board?: string; image?: File | null },
+  ): Promise<Post> => {
+    // POST /posts is now multipart so a single request can include the
+    // optional image alongside the message.
+    const form = new FormData();
+    form.append("message", message);
+    if (opts?.board) form.append("board", opts.board);
+    if (opts?.image) form.append("image", opts.image);
+    const res = await fetch(`${BASE_URL}/posts`, {
       method: "POST",
-      body: { message, board },
-      token,
-      username,
-    }),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "X-Username": username,
+      },
+      body: form,
+    });
+    const text = await res.text();
+    let payload: unknown = null;
+    if (text) {
+      try { payload = JSON.parse(text); } catch { payload = text; }
+    }
+    if (!res.ok) {
+      throw new ApiError(extractDetail(payload) || `${res.status} ${res.statusText}`, res.status);
+    }
+    return payload as Post;
+  },
   deletePost: (id: number, token: string) =>
     request<void>(`/posts/${id}`, { method: "DELETE", token }),
 
@@ -165,4 +193,28 @@ export const api = {
 
   // ---- boards ----
   listBoards: () => request<Board[]>("/boards"),
+
+  // ---- DMs ----
+  listDMs: (token: string) => request<DMConversation[]>("/dms", { token }),
+  getDMThread: (username: string, token: string) =>
+    request<DMThread>(`/dms/${encodeURIComponent(username)}`, { token }),
+  sendDM: (username: string, message: string, token: string) =>
+    request<DMMessage>(`/dms/${encodeURIComponent(username)}`, {
+      method: "POST",
+      body: { message },
+      token,
+    }),
+
+  // ---- settings ----
+  changePassword: (
+    username: string,
+    current_password: string,
+    new_password: string,
+    token: string,
+  ) =>
+    request<{ ok: boolean }>(`/users/${encodeURIComponent(username)}/password`, {
+      method: "PATCH",
+      body: { current_password, new_password },
+      token,
+    }),
 };

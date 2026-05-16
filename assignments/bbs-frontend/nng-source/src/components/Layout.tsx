@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
 
+const UNREAD_POLL_MS = 30000;
+
 export function Layout() {
-  const { username, logout } = useAuth();
+  const { username, token, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
+  const [unreadDMs, setUnreadDMs] = useState(0);
 
   // Fetch current user's avatar so the header chip shows it. Re-runs whenever
   // the logged-in username changes (login / logout / switch user).
@@ -30,6 +34,24 @@ export function Layout() {
     window.addEventListener("bbs:avatar-changed", onAvatarChange);
     return () => window.removeEventListener("bbs:avatar-changed", onAvatarChange);
   }, []);
+
+  // Poll for total unread DM count to show a badge on the nav link. Refresh
+  // immediately on route change so opening a thread clears the badge fast.
+  useEffect(() => {
+    if (!token) { setUnreadDMs(0); return; }
+    let cancelled = false;
+    async function poll() {
+      try {
+        const convos = await api.listDMs(token!);
+        if (!cancelled) {
+          setUnreadDMs(convos.reduce((s, c) => s + c.unread_count, 0));
+        }
+      } catch { /* ignore */ }
+    }
+    void poll();
+    const id = setInterval(() => { if (!document.hidden) void poll(); }, UNREAD_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [token, location.pathname]);
 
   // Global keyboard shortcuts:
   //   "/"  -> focus search box on feed
@@ -73,6 +95,16 @@ export function Layout() {
             <NavLink to="/" end>Feed</NavLink>
             <NavLink to="/boards">Boards</NavLink>
             <NavLink to="/users">Users</NavLink>
+            {username && (
+              <NavLink to="/dms" className="nav-with-badge">
+                DMs
+                {unreadDMs > 0 && (
+                  <span className="nav-badge" aria-label={`${unreadDMs} unread`}>
+                    {unreadDMs}
+                  </span>
+                )}
+              </NavLink>
+            )}
           </nav>
           <div className="auth-status">
             {username ? (
@@ -81,7 +113,10 @@ export function Layout() {
                   <Avatar username={username} src={myAvatar} size="sm" />
                   <span>{username}</span>
                 </Link>
-                <button type="button" onClick={onLogout} className="btn btn-link">
+                <Link to="/settings" className="btn btn-link btn-sm" aria-label="Settings">
+                  ⚙
+                </Link>
+                <button type="button" onClick={onLogout} className="btn btn-link btn-sm">
                   Log out
                 </button>
               </>

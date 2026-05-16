@@ -17,6 +17,9 @@ interface ComposeProps {
 
 let placeholderCounter = -1;
 
+const IMAGE_MAX_BYTES = 5_000_000;
+const IMAGE_MIME_RE = /^image\/(png|jpeg|webp|gif)$/;
+
 export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: ComposeProps) {
   const { username, token } = useAuth();
   const [text, setText] = useState("");
@@ -24,7 +27,10 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch board names for the autocomplete datalist. Cheap, runs once on mount.
   // If it fails we just don't show suggestions; the input is still free-text.
@@ -54,6 +60,31 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
     return () => window.removeEventListener("bbs:focus-compose", handler);
   }, []);
 
+  // Revoke the object URL when the image changes / unmounts to avoid leaks.
+  useEffect(() => {
+    if (!image) { setImagePreview(null); return; }
+    const url = URL.createObjectURL(image);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
+
+  function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";  // allow re-picking the same file
+    if (!f) return;
+    if (!IMAGE_MIME_RE.test(f.type)) {
+      setError("Image must be PNG, JPG, WebP, or GIF.");
+      return;
+    }
+    if (f.size > IMAGE_MAX_BYTES) {
+      setError(`Image too large (max ${IMAGE_MAX_BYTES / 1_000_000} MB).`);
+      return;
+    }
+    setError(null);
+    setImage(f);
+  }
+  function clearImage() { setImage(null); }
+
   if (!username || !token) {
     return (
       <div className="compose compose-locked">
@@ -82,6 +113,7 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
 
     const targetBoard = effectiveBoard || "general";
     const placeholderId = placeholderCounter--;
+    const attachedImage = image;
     const optimistic: Post = {
       id: placeholderId,
       username: username!,
@@ -89,22 +121,24 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
       message: trimmed,
       created_at: new Date().toISOString(),
       updated_at: null,
+      avatar_url: null,
+      image_url: imagePreview,
     };
     onOptimisticAdd(optimistic);
     setText("");
+    setImage(null);
 
     try {
-      const real = await api.createPost(
-        trimmed,
-        username!,
-        token!,
-        effectiveBoard || undefined,
-      );
+      const real = await api.createPost(trimmed, username!, token!, {
+        board: effectiveBoard || undefined,
+        image: attachedImage,
+      });
       onConfirm(placeholderId, real);
     } catch (err) {
       onRollback(placeholderId);
       setError(err instanceof Error ? err.message : "Could not post.");
       setText(trimmed);
+      setImage(attachedImage);
     } finally {
       setSubmitting(false);
     }
@@ -157,18 +191,52 @@ export function Compose({ onOptimisticAdd, onConfirm, onRollback, board }: Compo
           </>
         )}
       </div>
+      {imagePreview && (
+        <div className="compose-image-preview" role="group" aria-label="Attached image preview">
+          <img src={imagePreview} alt="" />
+          <button
+            type="button"
+            className="btn btn-link btn-danger btn-sm compose-image-clear"
+            onClick={clearImage}
+            aria-label="Remove attached image"
+          >
+            Remove image
+          </button>
+        </div>
+      )}
+
       <div className="compose-footer">
         <span id="compose-count" className={countClass} aria-live="polite">
           {text.length} / {MAX_LEN}
         </span>
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={disabled}
-          aria-label="Post message"
-        >
-          {submitting ? "Posting..." : "Post"}
-        </button>
+        <div className="compose-footer-actions">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={onPickImage}
+            className="visually-hidden"
+            aria-label="Attach image"
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={submitting}
+            aria-label={image ? "Replace attached image" : "Attach image"}
+            title="Attach image (PNG/JPG/WebP/GIF, up to 5 MB)"
+          >
+            {image ? "🖼 Change" : "🖼 Attach"}
+          </button>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={disabled}
+            aria-label="Post message"
+          >
+            {submitting ? "Posting..." : "Post"}
+          </button>
+        </div>
       </div>
       {boardInvalid && (
         <div role="alert" className="inline-error">

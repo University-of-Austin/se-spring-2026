@@ -16,6 +16,33 @@ export interface Post {
   created_at: string;
   updated_at: string | null;
   avatar_url: string | null;
+  image_url: string | null;
+}
+
+export interface DMMessage {
+  id: number;
+  from_username: string;
+  to_username: string;
+  from_me: boolean;
+  message: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface DMConversation {
+  partner: { username: string; avatar_url: string | null };
+  last_message: {
+    message: string;
+    created_at: string;
+    from_me: boolean;
+    read_at: string | null;
+  };
+  unread_count: number;
+}
+
+export interface DMThread {
+  partner: { username: string; avatar_url: string | null };
+  messages: DMMessage[];
 }
 
 export interface LoginResponse {
