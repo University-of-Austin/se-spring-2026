@@ -3,11 +3,13 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { useAuth } from "../auth";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
+import { useTheme } from "../theme";
 
 const UNREAD_POLL_MS = 30000;
 
 export function Layout() {
   const { username, token, logout } = useAuth();
+  const { theme, resolved, cycle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [myAvatar, setMyAvatar] = useState<string | null>(null);
@@ -107,6 +109,15 @@ export function Layout() {
             )}
           </nav>
           <div className="auth-status">
+            <button
+              type="button"
+              className="btn btn-link btn-sm theme-toggle"
+              onClick={cycle}
+              aria-label={`Theme: ${theme} (currently ${resolved}). Click to cycle.`}
+              title={`Theme: ${theme}`}
+            >
+              {theme === "system" ? "💻" : theme === "dark" ? "🌙" : "☀"}
+            </button>
             {username ? (
               <>
                 <Link to={`/users/${encodeURIComponent(username)}`} className="auth-username">

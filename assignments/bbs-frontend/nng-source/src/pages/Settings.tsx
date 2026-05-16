@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { useBlockedBoards } from "../blockedBoards";
 import { Avatar } from "../components/Avatar";
 import { ErrorBox } from "../components/ErrorBox";
 import { Spinner } from "../components/Spinner";
+import { useTheme, type Theme } from "../theme";
 import type { User } from "../types";
 
 const BIO_MAX = 200;
@@ -32,46 +34,156 @@ export function Settings() {
 
   useEffect(() => { void load(); }, [load]);
 
-  if (!username || !token) {
-    return (
-      <div className="page page-settings">
-        <h1>Settings</h1>
-        <p className="empty-state">Log in to manage your account.</p>
-      </div>
-    );
-  }
-
-  if (loading) return <div className="page"><Spinner label="Loading your settings..." /></div>;
-  if (error) return <div className="page"><ErrorBox message={error} onRetry={load} /></div>;
-  if (!user) return null;
+  // Account sections require a login; theme + blocked-boards work for
+  // anyone since they're stored per-browser.
+  const accountReady = !!(username && token);
 
   return (
     <div className="page page-settings">
       <h1>Settings</h1>
 
-      <section className="settings-section" aria-labelledby="settings-avatar-heading">
-        <h2 id="settings-avatar-heading">Profile picture</h2>
-        <AvatarEditor user={user} onChange={setUser} />
+      <section className="settings-section" aria-labelledby="settings-theme-heading">
+        <h2 id="settings-theme-heading">Theme</h2>
+        <ThemePicker />
       </section>
 
-      <section className="settings-section" aria-labelledby="settings-bio-heading">
-        <h2 id="settings-bio-heading">Bio</h2>
-        <BioEditor user={user} onSaved={setUser} />
+      <section
+        className="settings-section"
+        aria-labelledby="settings-blocked-heading"
+        id="blocked-boards"
+      >
+        <h2 id="settings-blocked-heading">Muted boards</h2>
+        <BlockedBoardsEditor />
       </section>
 
-      <section className="settings-section" aria-labelledby="settings-pw-heading">
-        <h2 id="settings-pw-heading">Change password</h2>
-        <PasswordEditor onChanged={() => {
-          // On success, force the user to sign in again.
-          void logout().then(() => navigate("/login"));
-        }} />
-      </section>
+      {!accountReady && (
+        <p className="empty-state">Log in to edit your profile and password.</p>
+      )}
 
-      <p className="auth-alt">
-        Want to see your public profile?{" "}
-        <Link to={`/users/${encodeURIComponent(username)}`}>View profile</Link>
+      {accountReady && loading && <Spinner label="Loading account..." />}
+      {accountReady && error && <ErrorBox message={error} onRetry={load} />}
+      {accountReady && user && (
+        <>
+          <section className="settings-section" aria-labelledby="settings-avatar-heading">
+            <h2 id="settings-avatar-heading">Profile picture</h2>
+            <AvatarEditor user={user} onChange={setUser} />
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-bio-heading">
+            <h2 id="settings-bio-heading">Bio</h2>
+            <BioEditor user={user} onSaved={setUser} />
+          </section>
+
+          <section className="settings-section" aria-labelledby="settings-pw-heading">
+            <h2 id="settings-pw-heading">Change password</h2>
+            <PasswordEditor onChanged={() => {
+              void logout().then(() => navigate("/login"));
+            }} />
+          </section>
+        </>
+      )}
+
+      {accountReady && user && (
+        <p className="auth-alt">
+          Want to see your public profile?{" "}
+          <Link to={`/users/${encodeURIComponent(username!)}`}>View profile</Link>
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+function ThemePicker() {
+  const { theme, resolved, setTheme } = useTheme();
+  const options: { value: Theme; label: string; icon: string }[] = [
+    { value: "light",  label: "Light",  icon: "☀" },
+    { value: "dark",   label: "Dark",   icon: "🌙" },
+    { value: "system", label: "System", icon: "💻" },
+  ];
+  return (
+    <div className="theme-picker" role="radiogroup" aria-label="Theme">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          role="radio"
+          aria-checked={theme === opt.value}
+          className={`theme-option ${theme === opt.value ? "theme-option-active" : ""}`}
+          onClick={() => setTheme(opt.value)}
+        >
+          <span className="theme-option-icon" aria-hidden="true">{opt.icon}</span>
+          <span>{opt.label}</span>
+        </button>
+      ))}
+      <p className="hint" style={{ marginTop: "var(--gap-sm)", width: "100%" }}>
+        Currently rendering: <strong>{resolved}</strong>.
+        {theme === "system" && " Follows your OS preference."}
       </p>
     </div>
+  );
+}
+
+
+function BlockedBoardsEditor() {
+  const { blocked, block, unblock } = useBlockedBoards();
+  const [input, setInput] = useState("");
+  const list = [...blocked].sort();
+
+  function onAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const name = input.trim().toLowerCase();
+    if (!name) return;
+    if (!/^[a-z0-9_-]+$/.test(name)) return;
+    block(name);
+    setInput("");
+  }
+
+  return (
+    <>
+      <p className="hint" style={{ marginBottom: "var(--gap-sm)" }}>
+        Muted boards are hidden from your main feed. You can still visit them
+        directly from the Boards page.
+      </p>
+      {list.length === 0 ? (
+        <p className="empty-state" style={{ padding: "var(--gap-sm) 0", textAlign: "left" }}>
+          No muted boards yet.
+        </p>
+      ) : (
+        <ul className="muted-board-list" aria-label="Muted boards">
+          {list.map((b) => (
+            <li key={b} className="muted-board-item">
+              <span className="muted-board-name">#{b}</span>
+              <button
+                type="button"
+                className="btn btn-link btn-sm"
+                onClick={() => unblock(b)}
+              >
+                Unmute
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form onSubmit={onAdd} className="muted-board-add">
+        <label htmlFor="mute-board-input" className="visually-hidden">Mute a board</label>
+        <input
+          id="mute-board-input"
+          type="text"
+          placeholder="Mute another board (e.g. random)"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          maxLength={30}
+        />
+        <button
+          type="submit"
+          className="btn btn-secondary btn-sm"
+          disabled={!input.trim()}
+        >
+          Mute
+        </button>
+      </form>
+    </>
   );
 }
 

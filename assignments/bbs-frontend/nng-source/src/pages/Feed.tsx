@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
+import { useBlockedBoards } from "../blockedBoards";
 import { Compose } from "../components/Compose";
 import { ErrorBox } from "../components/ErrorBox";
 import { PostCard } from "../components/PostCard";
@@ -13,6 +14,7 @@ const POLL_INTERVAL_MS = 5000;
 
 export function Feed() {
   const { username, token } = useAuth();
+  const { blocked, isBlocked, block, unblock } = useBlockedBoards();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") ?? "";
   const board = searchParams.get("board") ?? "";
@@ -166,6 +168,16 @@ export function Feed() {
     setSearchParams(next);
   }
 
+  // Block list only filters the unfiltered feed. If the user is explicitly
+  // viewing a board (?board=foo), we show its posts even if foo is muted --
+  // they navigated there on purpose.
+  const visiblePosts = useMemo(() => {
+    if (board) return posts;
+    if (blocked.size === 0) return posts;
+    return posts.filter((p) => !isBlocked(p.board));
+  }, [posts, board, blocked, isBlocked]);
+  const hiddenCount = posts.length - visiblePosts.length;
+
   return (
     <div className="page page-feed">
       <section className="feed-search-section" aria-label="Search">
@@ -200,10 +212,32 @@ export function Feed() {
         <div className="board-context" role="status">
           <span>
             Filtering by board: <strong>#{board}</strong>
+            {isBlocked(board) && <em className="board-context-muted"> · muted</em>}
           </span>
-          <button type="button" className="btn btn-link btn-sm" onClick={clearBoard}>
-            Show all boards
-          </button>
+          <span className="board-context-actions">
+            <button
+              type="button"
+              className="btn btn-link btn-sm"
+              onClick={() => isBlocked(board) ? unblock(board) : block(board)}
+            >
+              {isBlocked(board) ? "Unmute" : "Mute"} #{board}
+            </button>
+            <button type="button" className="btn btn-link btn-sm" onClick={clearBoard}>
+              Show all
+            </button>
+          </span>
+        </div>
+      )}
+
+      {!board && hiddenCount > 0 && (
+        <div className="board-context board-context-info" role="status">
+          <span>
+            Hiding {hiddenCount} {hiddenCount === 1 ? "post" : "posts"} from{" "}
+            {blocked.size} muted {blocked.size === 1 ? "board" : "boards"}.
+          </span>
+          <Link to="/settings#blocked-boards" className="btn btn-link btn-sm">
+            Manage in settings
+          </Link>
         </div>
       )}
 
@@ -228,12 +262,18 @@ export function Feed() {
         <Spinner label="Loading feed..." />
       ) : error ? (
         <ErrorBox message={error} onRetry={load} />
-      ) : posts.length === 0 ? (
-        <p className="empty-state">{q ? "No matching posts." : "No posts yet. Be the first."}</p>
+      ) : visiblePosts.length === 0 ? (
+        <p className="empty-state">
+          {q
+            ? "No matching posts."
+            : posts.length > 0
+              ? "All posts here are from muted boards. Manage in Settings."
+              : "No posts yet. Be the first."}
+        </p>
       ) : (
         <>
           <ul className="post-list" aria-label="Posts">
-            {posts.map((p) => (
+            {visiblePosts.map((p) => (
               <li key={p.id < 0 ? `temp-${p.id}` : p.id}>
                 <PostCard
                   post={p}

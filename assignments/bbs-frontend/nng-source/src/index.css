@@ -39,8 +39,14 @@
   --line:   1.55;
 }
 
+/* Light palette. Applied when:
+ *  (a) the user explicitly chose light via data-theme="light", OR
+ *  (b) the OS prefers light AND the user hasn't forced dark.
+ * Forced dark (data-theme="dark") always wins. Default (no attribute, OS
+ * prefers dark) falls through to the :root block above. */
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg:          #fafaf7;
     --bg-elevated: #ffffff;
     --bg-hover:    #f0f0eb;
@@ -53,6 +59,20 @@
     --border:      #d4d4cc;
     --border-soft: #e8e8e4;
   }
+}
+
+:root[data-theme="light"] {
+  --bg:          #fafaf7;
+  --bg-elevated: #ffffff;
+  --bg-hover:    #f0f0eb;
+  --fg:          #1a1a26;
+  --fg-muted:    #5a5a70;
+  --fg-dim:      #9a9aa6;
+  --accent:      #0a8d86;
+  --accent-fg:   #ffffff;
+  --accent-dim:  #5cf0e6;
+  --border:      #d4d4cc;
+  --border-soft: #e8e8e4;
 }
 
 /* ---- Reset / base ------------------------------------------------------ */
@@ -413,9 +433,12 @@ textarea { resize: vertical; min-height: 70px; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: stretch;
 }
 .board-list-item:hover { border-color: var(--accent-dim); background: var(--bg-hover); }
-.board-list-item a {
+.board-list-link {
+  flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -423,7 +446,7 @@ textarea { resize: vertical; min-height: 70px; }
   padding: var(--gap-sm) var(--gap);
   color: var(--fg);
 }
-.board-list-item a:hover { text-decoration: none; }
+.board-list-link:hover { text-decoration: none; }
 .board-name { font-weight: 600; color: var(--accent); }
 .board-meta { color: var(--fg-dim); font-size: var(--fs-xs); }
 
@@ -722,8 +745,92 @@ textarea { resize: vertical; min-height: 70px; }
   border-radius: var(--radius);
   padding: var(--gap);
   margin-bottom: var(--gap);
+  scroll-margin-top: 80px;   /* anchor links from elsewhere */
 }
 .settings-section h2 { margin-top: 0; font-size: var(--fs-lg); }
+
+/* ---- Theme picker -------------------------------------------------- */
+
+.theme-toggle {
+  font-size: var(--fs-md);
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-sm);
+}
+.theme-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  transition: background 0.1s, border-color 0.1s;
+}
+.theme-option:hover { background: var(--bg-hover); }
+.theme-option-active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.theme-option-active:hover { background: var(--accent-dim); }
+.theme-option-icon { font-size: 1.1em; }
+
+/* ---- Muted boards list -------------------------------------------- */
+
+.muted-board-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--gap-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-sm);
+}
+.muted-board-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+}
+.muted-board-name { font-weight: 600; color: var(--accent-dim); }
+
+.muted-board-add {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+}
+.muted-board-add input { flex: 1; max-width: 320px; }
+
+/* Feed: board-context info variant + actions */
+.board-context-info {
+  border-left-color: var(--warn);
+}
+.board-context-info strong { color: var(--warn); }
+.board-context-actions { display: inline-flex; gap: 4px; }
+.board-context-muted { color: var(--warn); font-style: italic; }
+
+/* Boards page: mute affordance + muted styling */
+.board-list-item-muted .board-list-link { opacity: 0.55; }
+.board-list-item-muted .board-name { text-decoration: line-through; }
+.board-mute-btn {
+  margin: 6px;
+  flex-shrink: 0;
+  align-self: center;
+}
 
 .avatar-editor-horiz {
   flex-direction: row;
