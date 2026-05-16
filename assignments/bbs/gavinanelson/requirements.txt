@@ -1,0 +1,4 @@
+SQLAlchemy==2.0.49
+textual==8.2.3
+textual-image>=0.11.0
+pillow>=12.2.0
