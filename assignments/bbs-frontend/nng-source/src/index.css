@@ -749,13 +749,7 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .settings-section h2 { margin-top: 0; font-size: var(--fs-lg); }
 
-/* ---- Theme picker -------------------------------------------------- */
-
-.theme-toggle {
-  font-size: var(--fs-md);
-  padding: 4px 8px;
-  line-height: 1;
-}
+/* ---- Theme picker (Settings page) ---------------------------------- */
 
 .theme-picker {
   display: flex;
