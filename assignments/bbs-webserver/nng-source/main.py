@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
@@ -103,6 +103,8 @@ app.add_middleware(
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
+AVATAR_DIR = STATIC_DIR / "avatars"
+AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -210,7 +212,7 @@ def now_iso() -> str:
 
 def fetch_user_row(conn, username: str):
     return conn.execute(
-        text("SELECT id, username, created_at, bio FROM users WHERE username = :u"),
+        text("SELECT id, username, created_at, bio, avatar FROM users WHERE username = :u"),
         {"u": username},
     ).fetchone()
 
@@ -221,17 +223,20 @@ def user_to_dict(conn, row) -> dict:
         text("SELECT COUNT(*) FROM posts WHERE user_id = :uid"),
         {"uid": row.id},
     ).scalar_one()
+    avatar = getattr(row, "avatar", None)
     return {
         "username": row.username,
         "created_at": row.created_at,
         "bio": row.bio,
         "post_count": post_count,
+        "avatar_url": f"/static/avatars/{avatar}" if avatar else None,
     }
 
 
 def post_row_to_dict(row) -> dict:
     # Silver: always include updated_at (None until the post is edited).
-    # Gold: include the board name.
+    # Gold: include the board name and the author's avatar URL.
+    avatar = getattr(row, "avatar", None)
     return {
         "id": row.id,
         "username": row.username,
@@ -239,6 +244,7 @@ def post_row_to_dict(row) -> dict:
         "message": row.message,
         "created_at": row.created_at,
         "updated_at": getattr(row, "updated_at", None),
+        "avatar_url": f"/static/avatars/{avatar}" if avatar else None,
     }
 
 
@@ -350,6 +356,108 @@ def patch_user(
         return user_to_dict(conn, row)
 
 
+# ---------- avatar upload / delete (beyond A2 spec; needed by A4 frontend) ----
+
+# Conservative allow-list. Magic-byte sniffing happens via Pillow below; the
+# extension here is just for the filename we save under.
+_AVATAR_MIME_TO_EXT = {
+    "image/png":  "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/gif":  "gif",
+}
+_AVATAR_MAX_BYTES = 1_000_000  # 1 MB
+
+
+def _require_self(conn, authorization: Optional[str], username: str):
+    me = resolve_session(conn, authorization)
+    if not me:
+        raise HTTPException(status_code=401, detail="authentication required")
+    if me.username != username:
+        raise HTTPException(status_code=403, detail="cannot modify another user's avatar")
+    return me
+
+
+@app.post("/users/{username}/avatar")
+async def upload_avatar(
+    username: str,
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+):
+    if file.content_type not in _AVATAR_MIME_TO_EXT:
+        raise HTTPException(
+            status_code=415,
+            detail=f"unsupported image type {file.content_type!r}; use PNG, JPG, WebP, or GIF",
+        )
+
+    # Read the upload, enforcing the size limit incrementally.
+    data = bytearray()
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > _AVATAR_MAX_BYTES:
+            raise HTTPException(
+                status_code=413, detail=f"image too large (max {_AVATAR_MAX_BYTES // 1000} KB)"
+            )
+
+    # Re-encode through Pillow to (a) verify it's actually an image, and (b)
+    # strip any embedded metadata / EXIF before serving it back.
+    try:
+        from io import BytesIO
+        from PIL import Image, UnidentifiedImageError
+        img = Image.open(BytesIO(bytes(data)))
+        img.verify()  # raises if the bytes aren't a real image
+    except (UnidentifiedImageError, Exception) as e:
+        raise HTTPException(status_code=400, detail=f"not a valid image: {e}")
+
+    with engine.begin() as conn:
+        row = fetch_user_row(conn, username)
+        if not row:
+            raise HTTPException(status_code=404, detail="user not found")
+        _require_self(conn, authorization, username)
+
+        ext = _AVATAR_MIME_TO_EXT[file.content_type]
+        filename = f"{row.id}.{ext}"
+
+        # Delete any prior avatar with a different extension so we don't leak.
+        for old_ext in _AVATAR_MIME_TO_EXT.values():
+            old = AVATAR_DIR / f"{row.id}.{old_ext}"
+            if old.exists() and old.name != filename:
+                try: old.unlink()
+                except Exception: pass
+
+        (AVATAR_DIR / filename).write_bytes(bytes(data))
+        conn.execute(
+            text("UPDATE users SET avatar = :a WHERE id = :id"),
+            {"a": filename, "id": row.id},
+        )
+        row = fetch_user_row(conn, username)
+        return user_to_dict(conn, row)
+
+
+@app.delete("/users/{username}/avatar")
+def delete_avatar(
+    username: str,
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+):
+    with engine.begin() as conn:
+        row = fetch_user_row(conn, username)
+        if not row:
+            raise HTTPException(status_code=404, detail="user not found")
+        _require_self(conn, authorization, username)
+
+        if row.avatar:
+            try: (AVATAR_DIR / row.avatar).unlink()
+            except FileNotFoundError: pass
+
+        conn.execute(text("UPDATE users SET avatar = NULL WHERE id = :id"), {"id": row.id})
+        row = fetch_user_row(conn, username)
+        return user_to_dict(conn, row)
+
+
 @app.get("/users/{username}/posts")
 def get_posts_for_user(
     username: str,
@@ -363,7 +471,7 @@ def get_posts_for_user(
             raise HTTPException(status_code=404, detail="user not found")
 
         sql = (
-            "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+            "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
             "FROM posts p JOIN users u ON p.user_id = u.id "
             "JOIN boards b ON p.board_id = b.id "
             "WHERE u.username = :u"
@@ -432,7 +540,7 @@ def get_posts_for_board(
             raise HTTPException(status_code=404, detail="board not found")
 
         sql = (
-            "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+            "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
             "FROM posts p JOIN users u ON p.user_id = u.id "
             "JOIN boards b ON p.board_id = b.id "
             "WHERE b.name = :bn"
@@ -489,6 +597,7 @@ def create_post(
             {"uid": user.id, "bid": board_id, "m": body.message, "c": created},
         )
         pid = result.lastrowid
+        avatar = getattr(user, "avatar", None)
         return {
             "id": pid,
             "username": user.username,
@@ -496,6 +605,7 @@ def create_post(
             "message": body.message,
             "created_at": created,
             "updated_at": None,
+            "avatar_url": f"/static/avatars/{avatar}" if avatar else None,
         }
 
 
@@ -509,7 +619,7 @@ def list_posts(
 ):
     with engine.connect() as conn:
         sql = (
-            "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+            "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
             "FROM posts p JOIN users u ON p.user_id = u.id "
             "JOIN boards b ON p.board_id = b.id "
             "WHERE 1=1"
@@ -537,7 +647,7 @@ def get_post(post_id: int):
     with engine.connect() as conn:
         row = conn.execute(
             text(
-                "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+                "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
                 "FROM posts p JOIN users u ON p.user_id = u.id "
                 "JOIN boards b ON p.board_id = b.id "
                 "WHERE p.id = :id"
@@ -564,7 +674,7 @@ def patch_post(
     with engine.begin() as conn:
         row = conn.execute(
             text(
-                "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+                "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
                 "FROM posts p JOIN users u ON p.user_id = u.id "
                 "JOIN boards b ON p.board_id = b.id "
                 "WHERE p.id = :id"
@@ -592,7 +702,7 @@ def patch_post(
 
         row = conn.execute(
             text(
-                "SELECT p.id, u.username, b.name AS board, p.message, p.created_at, p.updated_at "
+                "SELECT p.id, u.username, u.avatar, b.name AS board, p.message, p.created_at, p.updated_at "
                 "FROM posts p JOIN users u ON p.user_id = u.id "
                 "JOIN boards b ON p.board_id = b.id "
                 "WHERE p.id = :id"

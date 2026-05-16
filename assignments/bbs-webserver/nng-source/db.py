@@ -37,7 +37,8 @@ def init_db() -> None:
                 username TEXT UNIQUE NOT NULL,
                 created_at TEXT NOT NULL,
                 bio TEXT,
-                password_hash TEXT
+                password_hash TEXT,
+                avatar TEXT
             )
         """))
         conn.execute(text("""
@@ -72,6 +73,7 @@ def init_db() -> None:
         # duplicate columns; swallow and continue.
         for stmt in (
             "ALTER TABLE users ADD COLUMN password_hash TEXT",
+            "ALTER TABLE users ADD COLUMN avatar TEXT",
             "ALTER TABLE posts ADD COLUMN board_id INTEGER",
         ):
             try:
