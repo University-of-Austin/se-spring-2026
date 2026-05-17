@@ -1,0 +1,109 @@
+/*
+ * Design tokens — single source of truth for the visual system.
+ *
+ * Light mode is the default. Dark mode is opt-in either by the user
+ * (toggle on the header writes data-theme on <html>) or implicit via
+ * prefers-color-scheme when no preference has been set.
+ *
+ * Naming: --c-* color, --s-* spacing, --f-* font, --r-* radius.
+ */
+
+:root {
+  /* type scale — 1.125 ratio anchored at 1rem (16px) */
+  --f-xs: 0.75rem;
+  --f-sm: 0.875rem;
+  --f-md: 1rem;
+  --f-lg: 1.125rem;
+  --f-xl: 1.333rem;
+  --f-2xl: 1.777rem;
+  --f-3xl: 2.369rem;
+
+  --f-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono",
+    "Roboto Mono", Consolas, monospace;
+
+  /* spacing scale — 4px base */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-8: 3rem;
+  --s-10: 4rem;
+
+  /* radius */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* light theme palette */
+  --c-bg: #f7f4ed;
+  --c-surface: #fffdf8;
+  --c-surface-2: #efe9dc;
+  --c-border: #ddd4c2;
+  --c-text: #1a1a1a;
+  --c-text-muted: #6b6557;
+  --c-text-subtle: #908872;
+  --c-accent: #b85c1d;
+  --c-accent-fg: #fffdf8;
+  --c-accent-soft: #f5dfc8;
+  --c-danger: #b3261e;
+  --c-danger-soft: #f9d8d6;
+  --c-success: #2e7d32;
+  --c-focus: #b85c1d;
+
+  /* shadows */
+  --shadow-sm: 0 1px 2px rgba(40, 30, 10, 0.06);
+  --shadow-md: 0 4px 12px rgba(40, 30, 10, 0.08);
+
+  /* layout */
+  --max-content: 720px;
+  --header-h: 56px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --c-bg: #161513;
+  --c-surface: #1f1d1a;
+  --c-surface-2: #2a2723;
+  --c-border: #3b3731;
+  --c-text: #f1ece1;
+  --c-text-muted: #b3ab9a;
+  --c-text-subtle: #847d6f;
+  --c-accent: #f0a368;
+  --c-accent-fg: #1a1a1a;
+  --c-accent-soft: #3a2a1a;
+  --c-danger: #f5807a;
+  --c-danger-soft: #3a1d1c;
+  --c-success: #7dca85;
+  --c-focus: #f0a368;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --c-bg: #161513;
+    --c-surface: #1f1d1a;
+    --c-surface-2: #2a2723;
+    --c-border: #3b3731;
+    --c-text: #f1ece1;
+    --c-text-muted: #b3ab9a;
+    --c-text-subtle: #847d6f;
+    --c-accent: #f0a368;
+    --c-accent-fg: #1a1a1a;
+    --c-accent-soft: #3a2a1a;
+    --c-danger: #f5807a;
+    --c-danger-soft: #3a1d1c;
+    --c-success: #7dca85;
+    --c-focus: #f0a368;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}

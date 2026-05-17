@@ -1,0 +1,50 @@
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.author {
+  font-family: var(--f-mono);
+  color: var(--c-accent);
+}
+
+.count {
+  font-family: var(--f-mono);
+  font-size: var(--f-xs);
+  color: var(--c-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.countWarn {
+  color: var(--c-accent);
+}
+
+.countOver {
+  color: var(--c-danger);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.signedOut {
+  padding: var(--s-4);
+  background: var(--c-surface);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--r-lg);
+  text-align: center;
+  color: var(--c-text-muted);
+}

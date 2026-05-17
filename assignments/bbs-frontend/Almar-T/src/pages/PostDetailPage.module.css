@@ -1,0 +1,29 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.back {
+  align-self: flex-start;
+  font-size: var(--f-sm);
+  font-family: var(--f-mono);
+  color: var(--c-text-muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--c-accent);
+  text-decoration: underline;
+}
+
+.notFound {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-6);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+}
