@@ -1,0 +1,63 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.page header p {
+  color: var(--c-text-muted);
+  font-size: var(--f-sm);
+  line-height: 1.5;
+}
+
+.page header code {
+  font-family: var(--f-mono);
+  font-size: 0.85em;
+  padding: 0 4px;
+  background: var(--c-surface-2);
+  border-radius: 3px;
+}
+
+.currentNote {
+  padding: var(--s-2) var(--s-3);
+  border-left: 3px solid var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-text) !important;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+}
+
+.section h2 {
+  font-size: var(--f-md);
+  font-family: var(--f-mono);
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.form button {
+  align-self: flex-start;
+}

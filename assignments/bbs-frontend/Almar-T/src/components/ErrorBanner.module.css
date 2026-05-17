@@ -1,0 +1,32 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--c-danger-soft);
+  border: 1px solid var(--c-danger);
+  border-radius: var(--r-md);
+  color: var(--c-danger);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--f-sm);
+  font-family: var(--f-mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.detail {
+  font-size: var(--f-sm);
+  color: var(--c-text);
+  word-break: break-word;
+}

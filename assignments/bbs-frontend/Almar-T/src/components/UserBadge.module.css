@@ -1,0 +1,12 @@
+.badge {
+  font-family: var(--f-mono);
+  font-size: var(--f-sm);
+  color: var(--c-accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.badge:hover,
+.badge:focus-visible {
+  text-decoration: underline;
+}

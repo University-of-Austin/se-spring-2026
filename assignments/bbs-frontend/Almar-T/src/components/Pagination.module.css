@@ -1,0 +1,13 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--s-3) 0;
+}
+
+.end {
+  text-align: center;
+  font-size: var(--f-sm);
+  color: var(--c-text-subtle);
+  padding: var(--s-3) 0;
+  font-family: var(--f-mono);
+}
