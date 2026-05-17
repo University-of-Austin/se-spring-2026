@@ -42,6 +42,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -128,6 +129,19 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="BBS Webserver", lifespan=lifespan)
+
+# CORS — added for A4 frontend. Vite dev server serves the SPA on
+# :5173 and fetches this API on :8000; browsers treat those as
+# different origins, so without CORSMiddleware the browser refuses to
+# let JS read the response. Permissive in dev (`*`) is the simplest
+# correct setup — we don't use cookies, so the loose policy doesn't
+# leak credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------
