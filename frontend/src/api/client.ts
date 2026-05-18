@@ -266,12 +266,15 @@ export async function streamAdvice(
             // If it has optimal_action, it's the final AdviceResult
             if ("optimal_action" in parsed) {
               onDone(parsed as unknown as AdviceResult);
+            } else if (typeof parsed.text === "string") {
+              // Text chunk wrapped in JSON, e.g. {"text":"...","error":"..."}
+              onChunk(parsed.text);
             } else {
-              // Some other JSON — treat as text chunk
+              // Unrecognized JSON shape — fall back to raw payload
               onChunk(dataPayload);
             }
           } catch {
-            // Not JSON — text chunk
+            // Not JSON — plain text chunk
             onChunk(dataPayload);
           }
         }
