@@ -56,9 +56,16 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         request.url,
         traceback.format_exc(),
     )
+    # TEMP: also return the error type+message in the response body during the
+    # initial deploy/debug window. Lock this back down to a generic message
+    # once production is stable.
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={
+            "detail": "Internal server error",
+            "error_type": type(exc).__name__,
+            "error_message": str(exc)[:500],
+        },
     )
 
 
