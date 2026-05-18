@@ -1,0 +1,65 @@
+.skeleton {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.skeletonRow {
+  height: 12px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  margin-bottom: var(--space-2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skeletonRow:nth-child(2) {
+  width: 80%;
+}
+
+.skeletonRow:nth-child(3) {
+  width: 60%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.retry {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
