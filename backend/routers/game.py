@@ -113,7 +113,12 @@ async def _deal_hand(
             detail=f"Bet {bet} is above table maximum {table.max_bet}",
         )
 
-    # Find or create a session in "betting" or "playing" phase
+    # Find or create a session in "betting" or "playing" phase.
+    # Multiplayer: ALL seated players can deal into the same session, even
+    # after the first player flipped status to "playing". The per-user
+    # duplicate-hand guard below prevents double-dealing for the same user.
+    # Rounds that have moved past play (dealer_turn / finished) don't match
+    # this filter, so a fresh session is created — that's how replay works.
     result = await db.execute(
         select(GameSession).where(
             (GameSession.table_id == table_id)
@@ -121,10 +126,6 @@ async def _deal_hand(
         )
     )
     session = result.scalar_one_or_none()
-
-    # If a round is already playing (first player dealt), reject new joiners
-    if session is not None and session.status == "playing":
-        raise HTTPException(status_code=409, detail="Round already in progress at this table")
 
     if session is None:
         # Create a new session with a fresh deck

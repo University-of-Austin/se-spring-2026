@@ -647,48 +647,68 @@ async def test_invalid_token_returns_401_with_clean_message():
             os.environ["BETWISE_DEV_USER_ID"] = original
 
 
-# ─── Multiplayer round: join-existing-betting-session ────────────────────────
-# Criterion: second player deal joins the same betting session, not a new one.
-# Once first player has dealt (status "playing"), a second deal attempt → 409.
+# ─── Multiplayer round: second player joins the same session ─────────────────
+# Criterion: after the first player deals (session status flips to "playing"),
+# a SECOND seated player must still be able to deal into the same session and
+# get their own hand. Both hands then sit in the same session.
 
 @pytest.mark.asyncio
-async def test_deal_409_when_round_already_playing(client, other_client, db):
-    """After the first player deals (session status = playing), a second deal → 409."""
+async def test_second_player_can_deal_into_active_session(client, db):
+    """Multiplayer: second seated player's deal joins the same session.
+
+    We toggle app.dependency_overrides[get_current_user] manually between
+    requests because the `client` / `other_client` fixtures both set this
+    same global override and the second one wins. For a true two-user
+    flow we have to swap the override around each call.
+    """
+    from backend.main import app  # noqa: PLC0415
+    from backend.auth import get_current_user  # noqa: PLC0415
+    from backend.models import TableSeat, Hand  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
     await seed_user(db, TEST_USER_ID, "first_dealer", chip_balance=100_000)
     await seed_user(db, OTHER_USER_ID, "second_dealer", chip_balance=100_000)
     table = await seed_table(db)
 
     # Seat both players
-    from backend.models import TableSeat  # noqa: PLC0415
-    seat1 = TableSeat(
-        id=uuid.uuid4(),
-        table_id=table.id,
-        user_id=TEST_USER_ID,
-        seat_number=1,
-        joined_at=datetime.now(timezone.utc),
-    )
-    seat2 = TableSeat(
-        id=uuid.uuid4(),
-        table_id=table.id,
-        user_id=OTHER_USER_ID,
-        seat_number=2,
-        joined_at=datetime.now(timezone.utc),
-    )
-    db.add(seat1)
-    db.add(seat2)
+    db.add(TableSeat(
+        id=uuid.uuid4(), table_id=table.id, user_id=TEST_USER_ID,
+        seat_number=1, joined_at=datetime.now(timezone.utc),
+    ))
+    db.add(TableSeat(
+        id=uuid.uuid4(), table_id=table.id, user_id=OTHER_USER_ID,
+        seat_number=2, joined_at=datetime.now(timezone.utc),
+    ))
     await db.commit()
 
-    # First player deals — session transitions to "playing"
+    async def as_a(): return TEST_USER_ID
+    async def as_b(): return OTHER_USER_ID
+
+    # First player (A) deals — session transitions to "playing"
+    app.dependency_overrides[get_current_user] = as_a
     resp1 = await client.post(f"/api/tables/{table.id}/deal", json={"bet": 1_000})
     assert resp1.status_code in (200, 201), f"First deal failed: {resp1.text}"
+    session_id_a = resp1.json()["session_id"]
 
-    # Second player tries to deal into a now-playing session → must 409
-    resp2 = await other_client.post(f"/api/tables/{table.id}/deal", json={"bet": 1_000})
-    assert resp2.status_code == 409, (
-        f"Expected 409 when round already playing; got {resp2.status_code}: {resp2.text}"
+    # Swap to player B and try to deal into the same session
+    app.dependency_overrides[get_current_user] = as_b
+    resp2 = await client.post(f"/api/tables/{table.id}/deal", json={"bet": 1_000})
+    assert resp2.status_code in (200, 201), (
+        f"Second deal must succeed (multiplayer); got {resp2.status_code}: {resp2.text}"
     )
-    assert "round" in resp2.json().get("detail", "").lower(), (
-        f"409 detail should mention 'round': {resp2.json()}"
+    session_id_b = resp2.json()["session_id"]
+    assert session_id_a == session_id_b, (
+        f"Both hands must share one session; A={session_id_a} B={session_id_b}"
+    )
+
+    # And the session now holds two hands, one per user
+    session_uuid = uuid.UUID(session_id_a)
+    result = await db.execute(select(Hand).where(Hand.session_id == session_uuid))
+    hands = result.scalars().all()
+    assert len(hands) == 2, f"Expected 2 hands in the session, got {len(hands)}"
+    owner_ids = {h.user_id for h in hands}
+    assert TEST_USER_ID in owner_ids and OTHER_USER_ID in owner_ids, (
+        f"Both users must own a hand; got owners {owner_ids}"
     )
 
 
