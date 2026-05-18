@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -35,6 +36,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# A4: the React dev server runs on a different origin (localhost:5173) than the
+# API (localhost:8000), so the browser blocks fetches unless we explicitly allow
+# the origin. Kept narrow to the Vite default; production would set this from env.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def user_shape(conn, row) -> dict:
