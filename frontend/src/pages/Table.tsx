@@ -9,7 +9,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useTablePoll } from "../hooks/useTablePoll";
 import { useSession } from "../auth/supabase";
-import { dealHand, takeAction, leaveTable } from "../api/client";
+import { takeAction, leaveTable } from "../api/client";
 import type { Action } from "../types";
 import CardHand from "../components/CardHand";
 import TableSeats from "../components/TableSeats";
@@ -78,12 +78,10 @@ export default function Table() {
   const { session } = useSession();
   const currentUserId = session?.user.id ?? null;
 
-  const { tableState, myHand, chipyOpen, closeChipy, optimisticHit, rollbackOptimistic } =
-    useGameStore();
+  const { tableState, myHand, chipyOpen, closeChipy } = useGameStore();
 
   const [replayHandId, setReplayHandId] = useState<string | null>(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   useTablePoll(tableId ?? "", currentUserId);
 
@@ -99,19 +97,6 @@ export default function Table() {
     const realCards = myHand.cards.filter((c): c is NonNullable<typeof c> => c !== null);
     if (realCards.length === 2 && realCards[0].value === realCards[1].value) {
       legalActions.push("split");
-    }
-  }
-
-  async function handleOptimisticHit(): Promise<void> {
-    if (!tableId) return;
-    const actionId = `opt-${Date.now()}`;
-    optimisticHit(actionId);
-    setActionError(null);
-
-    const result = await takeAction(tableId, "hit");
-    if (result.error) {
-      rollbackOptimistic();
-      setActionError(result.error);
     }
   }
 
@@ -210,7 +195,7 @@ export default function Table() {
             <div className="h-1 bg-ink rounded-full" />
 
             {myHand && (
-              <div className={actionError ? "ring-4 ring-action-hit rounded-md animate-shake" : ""}>
+              <div>
                 <CardHand
                   cards={myHand.cards}
                   handValue={handValueDisplay(myHand.cards) ?? undefined}
@@ -219,10 +204,6 @@ export default function Table() {
               </div>
             )}
           </div>
-        )}
-
-        {actionError && (
-          <p role="alert" className="font-flavor text-cream text-sm text-center italic">{actionError}</p>
         )}
 
         {/* Outcome banner — Chipy reacts to the result, big readable announcement */}
@@ -266,7 +247,7 @@ export default function Table() {
         {canStartNewRound && (
           <div className="flex flex-col items-center gap-2">
             {isHandFinished && (
-              <p className="font-display text-cream text-2xl uppercase tracking-wider">
+              <p className="font-ui text-cream text-xl uppercase tracking-widest">
                 {t("Place your next bet")}
               </p>
             )}
