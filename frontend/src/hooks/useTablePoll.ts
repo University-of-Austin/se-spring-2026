@@ -3,21 +3,20 @@
  *
  * Gold requirement: real-time-ish multiplayer via polling.
  * - Clears interval on unmount.
- * - Clears when session status is "finished".
  * - Pauses when tab is hidden (visibilityState === "hidden").
- * - Triggers gameStore.openChipy() when it becomes the user's turn.
+ * - Continues across "finished" so the next Deal picks up the new session.
+ *
+ * Chipy triggers (pre-play / post-play) live in Table.tsx and ActionBar.tsx
+ * respectively — the polling hook stays pure state-reconciliation.
  */
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { getTableState } from "../api/client";
 import { useGameStore } from "../store/gameStore";
 
 const POLL_INTERVAL_MS = 3000;
 
 export function useTablePoll(tableId: string, currentUserId: string | null): void {
-  const { reconcileFromPoll, openChipy } = useGameStore();
-
-  // Track previous turn to detect change
-  const prevMyTurnRef = useRef(false);
+  const { reconcileFromPoll } = useGameStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -29,33 +28,7 @@ export function useTablePoll(tableId: string, currentUserId: string | null): voi
       if (cancelled) return;
       if (result.error || result.data === null) return;
 
-      const newState = result.data;
-      reconcileFromPoll(newState, currentUserId ?? "");
-
-      // NOTE: polling continues even when session.status === "finished" so
-      // that clicking "Deal" to start a fresh round actually picks up the
-      // newly-created session within one tick. We used to clearInterval
-      // here, which left the page frozen on the finished hand forever.
-
-      // Detect turn changes to open Chipy
-      if (currentUserId) {
-        const myHand = newState.hands.find((h) => h.user_id === currentUserId);
-        const isMyTurn =
-          newState.session?.status === "playing" &&
-          myHand?.status === "active";
-
-        // Non-trivial means not already blackjack or bust
-        const isNonTrivial =
-          myHand !== undefined &&
-          myHand.status !== "blackjack" &&
-          myHand.status !== "bust";
-
-        if (isMyTurn && isNonTrivial && !prevMyTurnRef.current) {
-          openChipy();
-        }
-
-        prevMyTurnRef.current = isMyTurn ?? false;
-      }
+      reconcileFromPoll(result.data, currentUserId ?? "");
     }
 
     // Poll immediately on mount, then on interval
@@ -75,5 +48,5 @@ export function useTablePoll(tableId: string, currentUserId: string | null): voi
       clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [tableId, currentUserId, reconcileFromPoll, openChipy]);
+  }, [tableId, currentUserId, reconcileFromPoll]);
 }

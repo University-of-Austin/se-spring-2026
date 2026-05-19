@@ -4,18 +4,18 @@
  * Radial felt gradient background, cream sub-panels with ink outlines,
  * Chipy panel slides in from below when it's the player's turn.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useTablePoll } from "../hooks/useTablePoll";
 import { useSession } from "../auth/supabase";
-import { takeAction, leaveTable } from "../api/client";
+import { leaveTable, streamPreAdvice } from "../api/client";
 import type { Action } from "../types";
 import CardHand from "../components/CardHand";
 import TableSeats from "../components/TableSeats";
 import BettingControls from "../components/BettingControls";
 import ActionBar from "../components/ActionBar";
-import ChipyPanel from "../components/ChipyPanel";
+import ChipyCoach from "../components/ChipyCoach";
 import ReplayModal from "../components/ReplayModal";
 import Chipy from "../components/Chipy";
 import type { ChipyExpression, ChipyAnimation, ChipyPose } from "../components/Chipy";
@@ -78,12 +78,56 @@ export default function Table() {
   const { session } = useSession();
   const currentUserId = session?.user.id ?? null;
 
-  const { tableState, myHand, chipyOpen, closeChipy } = useGameStore();
+  const {
+    tableState,
+    myHand,
+    beginChipyStream,
+    appendChipyChunk,
+    endChipyStream,
+    resetChipy,
+  } = useGameStore();
 
   const [replayHandId, setReplayHandId] = useState<string | null>(null);
   const [leaveLoading, setLeaveLoading] = useState(false);
 
   useTablePoll(tableId ?? "", currentUserId);
+
+  // Proactive Chipy: the moment my hand becomes active for the first time,
+  // fire the /pre stream so Chipy chimes in with a suggestion before I act.
+  // Tracked by hand ID so re-entering "active" on the same hand (e.g. polled
+  // twice while still active) doesn't restart the stream.
+  const lastPreHandRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!myHand) {
+      lastPreHandRef.current = null;
+      return;
+    }
+    const sessionPlaying = tableState?.session?.status === "playing";
+    const handActive = myHand.status === "active";
+    if (
+      sessionPlaying &&
+      handActive &&
+      lastPreHandRef.current !== myHand.id
+    ) {
+      lastPreHandRef.current = myHand.id;
+      const handId = myHand.id;
+      beginChipyStream("pre", handId);
+      void streamPreAdvice(
+        handId,
+        (chunk) => appendChipyChunk(chunk),
+        () => endChipyStream(),
+        () => endChipyStream(),
+      );
+    }
+  }, [myHand, tableState?.session?.status, beginChipyStream, appendChipyChunk, endChipyStream]);
+
+  // Wipe Chipy when leaving the table — keeps stale narration from flashing
+  // when the user re-enters another table.
+  useEffect(() => {
+    return () => {
+      resetChipy();
+    };
+  }, [resetChipy]);
 
   // Auto-leave when the user navigates away from the table page — covers
   // clicking the Lobby/Profile/Leaderboard buttons, the browser Back button,
@@ -189,7 +233,8 @@ export default function Table() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col gap-5 px-4 py-6 max-w-2xl mx-auto w-full relative z-10">
+      <main className="flex-1 px-4 py-6 max-w-5xl mx-auto w-full relative z-10 flex flex-col lg:flex-row gap-5 items-start">
+        <div className="flex-1 flex flex-col gap-5 w-full max-w-2xl mx-auto lg:mx-0">
         {/* Seats */}
         <TableSeats
           seats={tableState.seats}
@@ -327,33 +372,13 @@ export default function Table() {
         )}
 
         {/* Action bar */}
-        {sessionStatus === "playing" && isMyTurn && !chipyOpen && (
+        {sessionStatus === "playing" && isMyTurn && (
           <ActionBar
             tableId={tableId}
             legalActions={legalActions}
             isMyTurn={isMyTurn}
+            handId={myHand?.id ?? null}
           />
-        )}
-
-        {/* Chipy panel */}
-        {chipyOpen && myHand && tableState.session && (
-          <div className="fixed inset-x-0 bottom-0 sm:relative sm:inset-auto z-40 sm:z-auto
-            flex justify-center p-4">
-            <ChipyPanel
-              handId={myHand.id}
-              legalActions={legalActions}
-              dealerUpcard={
-                (tableState.session.dealer_cards[1] ?? tableState.session.dealer_cards[0]) as {
-                  suit: string;
-                  value: string;
-                }
-              }
-              onConfirm={(action: Action) => {
-                closeChipy();
-                void takeAction(tableId, action);
-              }}
-            />
-          </div>
         )}
 
         {/* Replay button */}
@@ -365,6 +390,12 @@ export default function Table() {
             {t("Review the hand")}
           </button>
         )}
+        </div>
+
+        {/* Always-on Chipy side rail. Pinned to the top on desktop so it
+            doesn't shift as the felt grows; full-width above the felt on
+            mobile (lg breakpoint flips the flex direction). */}
+        <ChipyCoach />
       </main>
 
       {replayHandId && (

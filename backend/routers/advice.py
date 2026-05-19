@@ -27,11 +27,18 @@ from backend.schemas import AdviceIn
 
 router = APIRouter(prefix="/advice", tags=["advice"])
 
-# System prompt for Chipy (verbatim from source spec Step 3)
+# System prompt for Chipy.
+#
+# Plain-text constraint: the panel renders these chunks as raw text, so any
+# markdown (## headers, ** bold, * bullets, backticks) shows up literally and
+# looks busted. We instruct the model to write in plain prose. The client also
+# strips these defensively in ChipyCoach.tsx as a belt-and-suspenders.
 _CHIPY_SYSTEM_PROMPT = (
-    "You are Chipy, an expert blackjack strategy coach. "
-    "Explain decisions clearly and concisely in 2-3 sentences. "
-    "Be encouraging and educational. Focus on the mathematical reasoning."
+    "You are Chipy, an expert blackjack strategy coach sitting next to a friend "
+    "at the table. Speak in warm conversational prose, 1-2 short sentences. "
+    "Always give a reason. "
+    "Plain text only — no markdown. Do not use #, ##, **, *, backticks, or "
+    "bullet points. Do not bold or italicize anything."
 )
 
 
@@ -188,6 +195,101 @@ async def get_advice(
             "current_streak": current_streak,
             "best_streak": best_streak,
         }
+        yield f"data: {json.dumps(final)}\n\n".encode()
+
+    return StreamingResponse(
+        _sse_stream(),
+        media_type="text/event-stream",
+    )
+
+
+@router.post("/{hand_id}/pre")
+async def get_pre_advice(
+    hand_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Stream Chipy's pre-action suggestion for the given hand.
+
+    Unlike POST /api/advice/{hand_id} (which expects a player guess and updates
+    the user's streak), this endpoint just narrates the current state and
+    suggests the optimal play. Used by ChipyCoach to chime in proactively
+    the moment it's the player's turn — no commitment from the player yet.
+    No streak update, no player_actions write.
+    """
+    from sqlalchemy import select  # noqa: PLC0415
+    from backend.models import Hand  # noqa: PLC0415
+
+    # ── Ownership check before streaming begins ──────────────────────────────
+    pre_result = await db.execute(select(Hand).where(Hand.id == hand_id))
+    pre_hand = pre_result.scalar_one_or_none()
+    if pre_hand is None:
+        raise HTTPException(status_code=404, detail="Hand not found")
+    if pre_hand.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Cannot request advice for another player's hand")
+
+    async def _sse_stream() -> AsyncGenerator[bytes, None]:
+        from sqlalchemy import select  # noqa: PLC0415
+        from backend.models import Hand, GameSession  # noqa: PLC0415
+        from backend.game import strategy  # noqa: PLC0415
+        from backend.game import engine as eng  # noqa: PLC0415
+
+        result = await db.execute(select(Hand).where(Hand.id == hand_id))
+        hand = result.scalar_one_or_none()
+        if hand is None:
+            yield b"data: {\"error\": \"Hand not found\"}\n\n"
+            return
+
+        result = await db.execute(
+            select(GameSession).where(GameSession.id == hand.session_id)
+        )
+        session = result.scalar_one_or_none()
+        if session is None:
+            yield b"data: {\"error\": \"Session not found\"}\n\n"
+            return
+
+        dealer_cards = list(session.dealer_cards)
+        dealer_upcard = dealer_cards[0] if dealer_cards else {"suit": "spades", "value": "2"}
+
+        opt = strategy.optimal_action(
+            list(hand.cards),
+            dealer_upcard,
+            can_double=eng.can_double(list(hand.cards)),
+            can_split=eng.can_split(list(hand.cards)),
+        )
+
+        # Build a plain-English description of the situation
+        def _card_str(c: dict) -> str:
+            return f"{c['value']} of {c['suit']}"
+
+        cards_str = ", ".join(_card_str(c) for c in hand.cards if c)
+        upcard_str = _card_str(dealer_upcard)
+
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"It's my turn. I'm holding {cards_str}. Dealer shows {upcard_str}. "
+                    f"Basic strategy says the best play is '{opt}'. "
+                    f"In one or two short sentences, plain prose, tell me which play "
+                    f"you'd recommend and the reason. No markdown — no #, **, *, or backticks."
+                ),
+            }
+        ]
+
+        try:
+            async for chunk in _stream_anthropic(messages):
+                yield f"data: {json.dumps({'text': chunk})}\n\n".encode()
+        except Exception as e:  # noqa: BLE001
+            import logging as _logging  # noqa: PLC0415
+
+            _logging.getLogger(__name__).exception("Chipy pre-stream failed")
+            fallback_text = f"(Chipy's quiet — basic strategy says {opt} here.)"
+            yield f"data: {json.dumps({'text': fallback_text, 'error': type(e).__name__})}\n\n".encode()
+
+        # Final summary event so the client can flip the streaming flag.
+        # No streak / accuracy update — that's reserved for the post-play endpoint.
+        final = {"optimal_action": opt, "phase": "pre"}
         yield f"data: {json.dumps(final)}\n\n".encode()
 
     return StreamingResponse(

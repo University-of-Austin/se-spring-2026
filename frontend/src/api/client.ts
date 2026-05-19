@@ -192,6 +192,90 @@ export async function getWeakness(): Promise<ApiResult<WeakSpot[]>> {
  *   onDone(result) — called once with the final AdviceResult JSON
  *   onError(msg)   — called on network/parse errors
  */
+/**
+ * streamPreAdvice — POSTs to /api/advice/:handId/pre with no body. Used by
+ * ChipyCoach to chime in proactively the moment it's the player's turn.
+ *
+ * Unlike streamAdvice this does NOT require a player_guess and does NOT
+ * update the user's streak. The final SSE event has {optimal_action, phase:"pre"};
+ * we don't surface that to the caller — onDone fires regardless.
+ */
+export async function streamPreAdvice(
+  handId: string,
+  onChunk: (text: string) => void,
+  onDone: () => void,
+  onError: (message: string) => void,
+): Promise<void> {
+  try {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`/api/advice/${handId}/pre`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+    });
+
+    if (res.status === 401) {
+      fireSessionExpired();
+      onError(SESSION_EXPIRED_MSG);
+      return;
+    }
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const body = (await res.json()) as { detail?: string };
+        if (body.detail) message = body.detail;
+      } catch {
+        // ignore
+      }
+      onError(message);
+      return;
+    }
+    if (!res.body) {
+      onError("No response body from advice endpoint");
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() ?? "";
+      for (const event of events) {
+        if (!event.trim()) continue;
+        const dataLines = event
+          .split("\n")
+          .filter((line) => line.startsWith("data: "))
+          .map((line) => line.slice("data: ".length));
+        for (const dataPayload of dataLines) {
+          if (!dataPayload.trim()) continue;
+          try {
+            const parsed = JSON.parse(dataPayload) as Record<string, unknown>;
+            if ("optimal_action" in parsed) {
+              // Final event for /pre — we don't need the payload, just close.
+              onDone();
+              return;
+            }
+            if (typeof parsed.text === "string") {
+              onChunk(parsed.text);
+            } else {
+              onChunk(dataPayload);
+            }
+          } catch {
+            onChunk(dataPayload);
+          }
+        }
+      }
+    }
+    onDone();
+  } catch {
+    onError(NETWORK_ERROR_MSG);
+  }
+}
+
 export async function streamAdvice(
   handId: string,
   guess: Action,

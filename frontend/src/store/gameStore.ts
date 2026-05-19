@@ -22,6 +22,17 @@ interface GameState {
   pendingActionId: string | null;
   /** Face-down card placeholders inserted by optimisticHit. */
   pendingOptimisticCards: Card[];
+
+  // ─── ChipyCoach (always-on side panel) ──────────────────────────────────
+  /** Accumulated narration text Chipy is currently streaming. */
+  chipyText: string;
+  /** True while an SSE stream is in flight. */
+  chipyStreaming: boolean;
+  /** Which phase the coach is in — drives the banner label + mascot mood. */
+  chipyPhase: "idle" | "pre" | "post";
+  /** ID of the hand the current narration is about (so stale pre-streams
+   *  for a previous hand can be ignored once a new one starts). */
+  chipyHandId: string | null;
 }
 
 // ─── Actions shape ────────────────────────────────────────────────────────────
@@ -50,6 +61,16 @@ interface GameActions {
    * pending action id is no longer in flight (i.e., the server has processed it).
    */
   reconcileFromPoll: (newState: TableState, currentUserId: string) => void;
+
+  // ─── ChipyCoach actions ─────────────────────────────────────────────────
+  /** Start a new Chipy narration. Clears prior text and flips streaming on. */
+  beginChipyStream: (phase: "pre" | "post", handId: string) => void;
+  /** Append one SSE text chunk to the current narration. */
+  appendChipyChunk: (chunk: string) => void;
+  /** Mark the SSE stream as done. */
+  endChipyStream: () => void;
+  /** Wipe Chipy back to idle (e.g. after a round ends). */
+  resetChipy: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -64,6 +85,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   betAmount: 500,
   pendingActionId: null,
   pendingOptimisticCards: [],
+  chipyText: "",
+  chipyStreaming: false,
+  chipyPhase: "idle",
+  chipyHandId: null,
 
   setTableState: (newState: TableState) => {
     set({ tableState: newState });
@@ -146,5 +171,31 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // but still update the rest of the table state
       set({ tableState: newState });
     }
+  },
+
+  beginChipyStream: (phase: "pre" | "post", handId: string) => {
+    set({
+      chipyText: "",
+      chipyStreaming: true,
+      chipyPhase: phase,
+      chipyHandId: handId,
+    });
+  },
+
+  appendChipyChunk: (chunk: string) => {
+    set((state) => ({ chipyText: state.chipyText + chunk }));
+  },
+
+  endChipyStream: () => {
+    set({ chipyStreaming: false });
+  },
+
+  resetChipy: () => {
+    set({
+      chipyText: "",
+      chipyStreaming: false,
+      chipyPhase: "idle",
+      chipyHandId: null,
+    });
   },
 }));

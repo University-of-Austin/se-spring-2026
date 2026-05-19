@@ -7,12 +7,15 @@
 import { useState } from "react";
 import type { Action } from "../types";
 import { t } from "../i18n";
-import { takeAction } from "../api/client";
+import { takeAction, streamAdvice } from "../api/client";
+import { useGameStore } from "../store/gameStore";
 
 interface ActionBarProps {
   tableId: string;
   legalActions: Action[];
   isMyTurn: boolean;
+  /** ID of the active hand — required to stream Chipy's critique after a play. */
+  handId?: string | null;
   onActionSuccess?: () => void;
 }
 
@@ -36,10 +39,12 @@ export default function ActionBar({
   tableId,
   legalActions,
   isMyTurn,
+  handId,
   onActionSuccess,
 }: ActionBarProps) {
   const [loading, setLoading] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { beginChipyStream, appendChipyChunk, endChipyStream } = useGameStore();
 
   const legalSet = new Set(legalActions);
 
@@ -50,8 +55,22 @@ export default function ActionBar({
     setLoading(null);
     if (result.error) {
       setError(result.error);
-    } else {
-      onActionSuccess?.();
+      return;
+    }
+    onActionSuccess?.();
+
+    // Fire Chipy's post-play critique — affirms or corrects with a reason.
+    // Streams into the always-visible ChipyCoach panel. Fire-and-forget;
+    // failures fall back to a generic message inside the stream itself.
+    if (handId) {
+      beginChipyStream("post", handId);
+      void streamAdvice(
+        handId,
+        action,
+        (chunk) => appendChipyChunk(chunk),
+        () => endChipyStream(),
+        () => endChipyStream(),
+      );
     }
   }
 
