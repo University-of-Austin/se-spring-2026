@@ -314,9 +314,21 @@ async def _get_table_state(
             created_at=session_row.created_at,
         )
 
-        # Fetch hands — all player cards are always visible
+        # Fetch hands ordered by the owner's seat_number so the frontend
+        # can rely on hands[0] being seat 1, hands[1] being seat 2, etc.
+        # (Tests that pick the active hand via `.find(h => h.status === 'active')`
+        # broke at round 18 of the multiplayer stress run because the order
+        # of the array was non-deterministic.) Hands without a seat row
+        # (post-leave or test fixtures) sort last.
         result = await db.execute(
-            select(Hand).where(Hand.session_id == session_row.id)
+            select(Hand)
+            .outerjoin(
+                TableSeat,
+                (TableSeat.user_id == Hand.user_id)
+                & (TableSeat.table_id == table_id),
+            )
+            .where(Hand.session_id == session_row.id)
+            .order_by(TableSeat.seat_number.asc().nullslast())
         )
         for hand in result.scalars().all():
             cards = list(hand.cards) if hand.cards else []

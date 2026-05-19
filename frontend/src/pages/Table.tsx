@@ -4,7 +4,7 @@
  * Radial felt gradient background, cream sub-panels with ink outlines,
  * Chipy panel slides in from below when it's the player's turn.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { useTablePoll } from "../hooks/useTablePoll";
@@ -85,6 +85,25 @@ export default function Table() {
 
   useTablePoll(tableId ?? "", currentUserId);
 
+  // Auto-leave when the user navigates away from the table page — covers
+  // clicking the Lobby/Profile/Leaderboard buttons, the browser Back button,
+  // and most refresh paths. Without this the user accumulated a stale seat
+  // at every table they ever visited (caught when a smoke test found one
+  // user seated at 7 different tables simultaneously). Fire-and-forget so
+  // it doesn't block navigation.
+  //
+  // Tab close / hard refresh aren't reliably covered by useEffect cleanup
+  // because the browser may cut the fetch off; for those cases the next
+  // sign-in could clean up stale seats server-side, but that's a follow-up.
+  useEffect(() => {
+    if (!tableId) return;
+    return () => {
+      void leaveTable(tableId).catch(() => {
+        /* fire-and-forget; user is already navigating away */
+      });
+    };
+  }, [tableId]);
+
   const sessionStatus = tableState?.session?.status;
   const myHandStatus = myHand?.status;
   const isMyTurn =
@@ -101,9 +120,10 @@ export default function Table() {
   }
 
   async function handleLeave(): Promise<void> {
+    // The Table-unmount effect will fire /leave on its own; this handler
+    // just shows the spinner state and routes back to the lobby.
     if (!tableId) return;
     setLeaveLoading(true);
-    await leaveTable(tableId);
     void navigate("/lobby");
   }
 
