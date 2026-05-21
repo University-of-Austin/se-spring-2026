@@ -22,6 +22,14 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
+      - name: Install lint tooling
+        run: pip install ruff
+
+      - name: Lint (ruff)
+        # Lint the backend package from the project root so import paths line
+        # up with how pytest runs.
+        run: ruff check backend
+
       - name: Run backend tests
         working-directory: backend
         env:
@@ -44,6 +52,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: TypeScript typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
 
       - name: Run frontend tests
         working-directory: frontend
