@@ -1,0 +1,217 @@
+/* ─────────────────────────────────────────────────────────────────
+   JBBS — Miami synthwave design tokens.
+
+   Theme rules:
+   - Deep navy-purple sky background with a sunset horizon glow.
+   - Hot-pink primary accent (links, focus rings, navigation).
+   - Electric-cyan secondary accent (primary buttons, brand highlight,
+     positive state).
+   - Sunset-orange for danger states.
+   - Orbitron everywhere, with weight ladder 400/500/600/700/900.
+
+   Any change to the look-and-feel of the whole app starts here;
+   every component CSS module reads from these custom properties.
+   ───────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface colors — night sky over Miami beach */
+  --color-bg:        #0a0a2e;
+  --color-bg-soft:   #15154a;
+  --color-bg-hover:  #20206b;
+  --color-border:    #3a2e7a;
+  --color-border-bright: #6a4fc8;
+
+  /* Text */
+  --color-text:      #fde6ff;
+  --color-muted:     #9d8fc4;
+
+  /* Hot pink — primary accent (links, nav, focus) */
+  --color-accent:        #ff2e9a;
+  --color-accent-hover:  #ff6cb9;
+
+  /* Electric cyan — secondary accent (primary buttons, brand) */
+  --color-accent-2:        #00f0ff;
+  --color-accent-2-hover:  #66f8ff;
+
+  /* Danger — sunset orange, on a dark crimson wash */
+  --color-danger:       #ff5e3a;
+  --color-danger-text:  #ff8466;
+  --color-danger-bg:    #2a0e1a;
+
+  /* Glow effects layered via text-shadow / box-shadow */
+  --glow-purple: 0 0 10px rgba(255, 46, 154, 0.55);
+  --glow-green:  0 0 10px rgba(0, 240, 255, 0.5);
+  --glow-pink:   0 0 10px rgba(255, 94, 58, 0.5);
+
+  /* Spacing ladder */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.5rem;
+
+  /* Type scale */
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.875rem;
+
+  --radius: 4px;
+
+  /* Orbitron is the entire type system.  At display weight it reads
+     like a CRT readout; at 400 it's still legible for body copy. */
+  --font-sans: "Orbitron", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Reset ───────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Body must NOT have a solid background — the sunset pseudo-elements
+   sit at z-index: -2 / -1 and would be painted behind body's own bg
+   (body is not a stacking-context root by default, so negative-z
+   children paint in step 2 of html's context, before body's bg in
+   step 3).  Leaving body transparent lets the sunset show through. */
+body {
+  background: transparent;
+}
+
+/* Miami sunset sky — fixed full-viewport layer behind everything.
+   Layered top-to-bottom in the gradient stack (so first listed
+   sits on top): the sun, a horizon glow, and the navy→pink sky. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background-image:
+    /* Sun — dome only.  Sized and positioned in vh so it stays
+       locked to the horizon (which is at 60vh): 24vh-wide box,
+       12vh tall, top edge at 48vh → bottom edge at exactly 60vh.
+       The radial-gradient is centered at the bottom of its box,
+       so only the upper half of the circle renders.  Using vh
+       throughout (instead of mixing vw with a vh-anchored
+       horizon) prevents drift on window resize. */
+    radial-gradient(circle 20vh at 50% 100%,
+                    rgba(255, 224, 130, 0.95) 0%,
+                    rgba(255, 168, 70, 0.85) 35%,
+                    rgba(255, 94, 58, 0.7) 60%,
+                    rgba(255, 46, 154, 0.45) 85%,
+                    transparent 100%),
+    /* Water reflection — a vertically-squashed half-circle.  Same
+       horizontal radius as the sun (20vh) so it lines up edge to
+       edge, but height crushed to 4vh, fanning down from 60vh.
+       Drawn as an ellipse so the vertical squash is part of the
+       gradient itself, not just clipping. */
+    radial-gradient(ellipse 20vh 4vh at 50% 0%,
+                    rgba(255, 168, 70, 0.55) 0%,
+                    rgba(255, 94, 58, 0.3) 55%,
+                    transparent 100%),
+    radial-gradient(ellipse 70% 14% at 50% 60%, rgba(255, 46, 154, 0.5), transparent 75%),
+    linear-gradient(to bottom,
+                    #050524 0%,
+                    #0d0a40 22%,
+                    #2a0f58 44%,
+                    #6a1872 54%,
+                    #c81f6e 59%,
+                    #050015 60%,
+                    #050015 100%);
+  background-size:
+    40vh 20vh,
+    40vh 4vh,
+    100% 100%,
+    100% 100%;
+  background-position:
+    50% 40vh,
+    50% 60vh,
+    0 0,
+    0 0;
+  background-repeat: no-repeat;
+}
+
+/* The Outrun perspective floor — a cyan/pink grid receding toward
+   the horizon line at 50% Y.  Covers the bottom 50vh.  Lower rotateX
+   keeps the grid standing up more (steeper-looking lines) and a
+   tight 180px perspective compresses the far end dramatically.
+   The mask fades the lines as they approach the horizon so they
+   don't terminate in a hard edge near the middle of the screen. */
+body::after {
+  content: "";
+  position: fixed;
+  left: -50%;
+  right: -50%;
+  bottom: 0;
+  height: 55vh;
+  z-index: -1;
+  pointer-events: none;
+  transform: perspective(420px) rotateX(48deg);
+  transform-origin: 50% 100%;
+  background:
+    linear-gradient(to right,  rgba(0, 240, 255, 0.7) 1px, transparent 1px) 0 0 / 56px 100%,
+    linear-gradient(to bottom, rgba(255, 46, 154, 0.7) 1px, transparent 1px) 0 0 / 100% 36px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+}
+
+/* Mirror grid in the sky — same construction but anchored at the
+   top of the viewport with the rotation inverted so the vanishing
+   point sits at the bottom edge (the horizon line at 50% Y).
+   Lives on html::before since body's two pseudo-element slots are
+   spoken for.  Stacking: above the sunset gradient (z:-3), below
+   the floor grid (z:-1). */
+html::before {
+  content: "";
+  position: fixed;
+  left: -50%;
+  right: -50%;
+  top: 0;
+  height: 75vh;
+  z-index: -2;
+  pointer-events: none;
+  transform: perspective(420px) rotateX(-48deg);
+  transform-origin: 50% 0%;
+  background:
+    linear-gradient(to right,  rgba(0, 240, 255, 0.5) 1px, transparent 1px) 0 0 / 56px 100%,
+    linear-gradient(to bottom, rgba(255, 46, 154, 0.5) 1px, transparent 1px) 0 0 / 100% 36px;
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+          mask-image: linear-gradient(to top, transparent 0%, rgba(0, 0, 0, 0.5) 35%, #000 70%, #000 100%);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Default placeholder colour against the dark bg */
+::placeholder {
+  color: var(--color-muted);
+  opacity: 0.7;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-text);
+}
+
+#root {
+  isolation: isolate;
+}

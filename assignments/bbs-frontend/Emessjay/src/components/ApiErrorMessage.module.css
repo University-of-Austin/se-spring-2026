@@ -1,0 +1,10 @@
+.message {
+  margin: var(--space-2) 0 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  border-left: 3px solid var(--color-danger);
+  box-shadow: 0 0 12px rgba(255, 94, 58, 0.2);
+}

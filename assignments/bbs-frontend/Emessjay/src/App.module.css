@@ -1,0 +1,66 @@
+.shell {
+  max-width: 680px;
+  margin: 0 auto;
+  min-height: 100vh;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 60px rgba(255, 46, 154, 0.12);
+}
+
+.main {
+  flex: 1 1 auto;
+}
+
+.footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.04em;
+}
+
+.footer kbd {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-bright);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-bg-soft);
+  color: var(--color-accent-2);
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 0.9em;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.55);
+}
+
+/* Skip-to-main link — hidden until focused.  Visible only when the
+   user tabs to it, which is the screen-reader / keyboard pattern. */
+.skipLink {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  text-decoration: none;
+  border-radius: 0 0 var(--radius) 0;
+  z-index: 100;
+  box-shadow: var(--glow-green);
+}
+
+.skipLink:focus {
+  left: 0;
+}
+
+@media (max-width: 480px) {
+  .shell {
+    border-left: 0;
+    border-right: 0;
+  }
+}

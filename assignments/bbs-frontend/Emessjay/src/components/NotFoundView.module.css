@@ -1,0 +1,35 @@
+.wrap {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-xl);
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  text-shadow: var(--glow-purple);
+}
+
+.body {
+  margin: 0 0 var(--space-4) 0;
+  color: var(--color-muted);
+}
+
+.button {
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+  border: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: var(--glow-green);
+}
+
+.button:hover {
+  background: var(--color-accent-2-hover);
+}
