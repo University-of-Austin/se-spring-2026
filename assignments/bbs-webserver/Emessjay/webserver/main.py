@@ -63,6 +63,7 @@ from typing import Optional
 import sqlite3
 
 from fastapi import FastAPI, HTTPException, Header, Path, Query, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from db import get_db, init_db
@@ -99,6 +100,30 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BBS Webserver", lifespan=lifespan)
+
+
+# ──────────────────────────────────────────────────────────────────────
+#  CORS
+# ──────────────────────────────────────────────────────────────────────
+#
+# Added for A4 (BBS Frontend).  The browser treats http://localhost:5173
+# (Vite dev server) and http://localhost:8000 (this API) as different
+# origins, and by default refuses to let JS on the page read responses
+# from this server.  CORSMiddleware tells the browser this server opts
+# in to cross-origin requests from the Vite dev origin.
+#
+# allow_origins is pinned to the Vite dev port — least-privilege; a
+# wildcard ("*") would let any page on the internet call this API.
+# allow_headers must include X-Username (the BBS identity header) so
+# preflight OPTIONS requests succeed on POST /posts; "*" covers that
+# plus Content-Type without enumeration.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ══════════════════════════════════════════════════════════════════════
