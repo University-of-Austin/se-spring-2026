@@ -1,0 +1,116 @@
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inline {
+  padding: 0.75rem 1rem;
+}
+
+.textarea {
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 0.5rem 0;
+  border: none;
+  resize: none;
+  background: transparent;
+  color: var(--color-fg);
+  width: 100%;
+  min-height: 2.5rem;
+}
+
+.textarea:focus {
+  outline: none;
+}
+
+.textarea::placeholder {
+  color: var(--color-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.625rem;
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.countWarn { color: #fbbf24; }
+.countOver { color: var(--color-danger-fg); font-weight: 600; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shortcut {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.shortcut kbd {
+  font-family: ui-monospace, "SF Mono", monospace;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  color: var(--color-muted);
+}
+
+.primary {
+  padding: 0.4rem 1rem;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.signinHint {
+  margin: 0;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
