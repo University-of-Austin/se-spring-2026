@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* Tailwind v4 dark variant — `dark:bg-...` works once <html> has the `dark` class */
+@custom-variant dark (&:is(.dark *));
+
+/* Flexoki tokens registered with Tailwind. Each generates utility classes:
+   --color-bg → bg-bg, --color-text → text-text, --color-accent → text-accent, etc.
+   Accent + highlight are the cyan family, after Flexoki's "turquoise". */
+@theme {
+  --color-bg:        #FFFCF0;  /* Flexoki paper */
+  --color-text:      #100F0F;  /* Flexoki ink black */
+  --color-muted:     #6F6E69;  /* Flexoki base-500 */
+  --color-border:    #DAD8CE;  /* Flexoki base-200 */
+  --color-accent:    #24837B;  /* Flexoki cy-600 — turquoise */
+  --color-highlight: #BFE8D9;  /* Flexoki cy-100 — pale mint, used for selection */
+  --color-error:     #AF3029;  /* Flexoki red-600 */
+  --color-success:   #66800B;  /* Flexoki green-600 */
+
+  /* Kepano's font stack (from stephango.com) — system sans first, Inter as fallback.
+     --font-serif aliases to the same stack since kepano uses one sans for everything;
+     this keeps existing `font-serif` classes working without find-and-replace. */
+  --font-sans:  -apple-system, BlinkMacSystemFont, "Inter", "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: -apple-system, BlinkMacSystemFont, "Inter", "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono:  ui-monospace, SFMono-Regular, "Cascadia Code", "IBM Plex Mono", "Roboto Mono", Menlo, Monaco, Consolas, "Source Code Pro", monospace;
+}
+
+/* Dark mode: applied when <html> has the `dark` class.
+   Overrides the theme tokens, so every Tailwind color utility flips automatically.
+   Accent uses cy-400 (lighter) so it pops against the black background. */
+.dark {
+  --color-bg:        #100F0F;  /* Flexoki black */
+  --color-text:      #CECDC3;  /* Flexoki base-200 */
+  --color-muted:     #87857D;  /* Flexoki base-400 */
+  --color-border:    #282726;  /* Flexoki base-900 */
+  --color-accent:    #3AA99F;  /* Flexoki cy-400 — turquoise on dark bg */
+  --color-highlight: #1C6C66;  /* Flexoki cy-700 — readable selection on dark */
+  --color-error:     #D14D41;  /* Flexoki red-400 */
+  --color-success:   #879A39;  /* Flexoki green-400 */
+}
+
+/* Body baseline using the theme tokens so it follows light/dark automatically.
+   Font size matches kepano's body (~18px); line-height roomy at 1.5. */
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;  /* 17px on default 16px base */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Text-selection highlight — kepano-style.
+   Mostly paper with just a whisper of mint tint. */
+::selection {
+  background-color: #ECF7EC;  /* paper + faint cy tint */
+  color: #100F0F;             /* Flexoki ink */
+}
+::-moz-selection {
+  background-color: #ECF7EC;
+  color: #100F0F;
+}
+
+.dark ::selection {
+  background-color: #122F2C;  /* black + faint cy tint */
+  color: #CECDC3;             /* Flexoki base-200 */
+}
+.dark ::-moz-selection {
+  background-color: #122F2C;
+  color: #CECDC3;
+}
+
+/* Element-active highlight — when a link or button is clicked down (mousedown,
+   before release), the whole element fills with a pale mint tint. Lighter
+   than the saturated --color-highlight so it matches kepano's look.
+   The :not selector skips invisible "stretched links" (an <a> absolutely
+   positioned over its whole parent card) — those would paint the entire
+   card mint on click, which feels like a huge flash. */
+a:active:not([data-no-active-bg]),
+button:active {
+  background-color: #DDF1E4;  /* Flexoki cy-50 */
+}
+.dark a:active:not([data-no-active-bg]),
+.dark button:active {
+  background-color: #164F4A;  /* Flexoki cy-800 */
+}
+
+/* Slide-down + fade in for newly mounted post cards. Only runs on mount, so
+   existing cards (kept across re-renders by their post.id key) stay still
+   while a freshly-arrived post drops in. */
+@keyframes postSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-post-in {
+  animation: postSlideIn 350ms ease-out;
+}
+
+/* Hide scrollbar in containers using `scrollbar-hide` while preserving scroll */
+.scrollbar-hide {
+  scrollbar-width: none;        /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                /* Chrome, Safari, Edge */
+}

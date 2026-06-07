@@ -1,0 +1,11 @@
+.validation-errors {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-h);
+  font-size: var(--text-small);
+  line-height: 1.45;
+}
+
+.validation-errors li {
+  margin-bottom: var(--space-2);
+}
