@@ -1,6 +1,9 @@
+import asyncio
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from db import (
     init_db,
@@ -16,10 +19,47 @@ from models import (
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+# ── SSE pub/sub for new posts ─────────────────────────────────────
+
+_subscribers: set[tuple[asyncio.Queue, Optional[str]]] = set()
+
+
+def _notify_post_subscribers(board: Optional[str]) -> None:
+    """Fan out a tick to every SSE subscriber whose filter matches."""
+    for q, sub_filter in list(_subscribers):
+        if sub_filter is None or sub_filter == board:
+            try:
+                q.put_nowait("tick")
+            except asyncio.QueueFull:
+                pass  # slow subscriber — drop this tick
+
+
+def _notify_for_post(post_id: int) -> None:
+    """Look up the post's board and notify subscribers matching that filter.
+
+    Called when a reaction, edit, or delete happens — the affected post is
+    already known; we just need its board to route the tick to the right
+    set of subscribers (None-filtered receives everything; board-filtered
+    receives only matches).
+    """
+    post = get_post(post_id)
+    if post is None:
+        return
+    _notify_post_subscribers(post.get("board"))
 
 
 # ── User endpoints ────────────────────────────────────────────────
@@ -91,6 +131,7 @@ def post_posts(body: CreatePost, request: Request):
         raise HTTPException(status_code=404, detail="Board not found")
     if isinstance(result, dict) and result.get("_error") == "parent_not_found":
         raise HTTPException(status_code=404, detail="Parent post not found")
+    _notify_post_subscribers(result.get("board"))
     return result
 
 
@@ -103,16 +144,40 @@ def list_posts(
     offset: int = Query(default=0, ge=0),
     cursor: Optional[str] = None,
     include_replies: bool = False,
+    sort: Optional[str] = None,
 ):
     result = get_posts(
         q=q, username=username, board=board,
         limit=limit, offset=offset, cursor=cursor,
-        include_replies=include_replies,
+        include_replies=include_replies, sort=sort,
     )
-    # If cursor was used, return envelope; otherwise return bare array for backwards compat
-    if cursor is not None:
+    # If cursor was used, or trending sort (envelope shape), return full envelope
+    if cursor is not None or sort == "trending":
         return result
     return result["posts"]
+
+
+# ── SSE stream ────────────────────────────────────────────────────
+
+@app.get("/posts/stream")
+async def stream_posts(board: Optional[str] = None):
+    q: asyncio.Queue = asyncio.Queue(maxsize=10)
+    sub = (q, board)
+    _subscribers.add(sub)
+
+    async def gen():
+        try:
+            yield ": connected\n\n"
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"data: {msg}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
+        finally:
+            _subscribers.discard(sub)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.get("/posts/{post_id}")
@@ -144,7 +209,9 @@ def patch_post(post_id: int, body: UpdateMessage, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if post["username"] != x_username:
         raise HTTPException(status_code=403, detail="You can only edit your own posts")
-    return update_post_message(post_id, body.message)
+    result = update_post_message(post_id, body.message)
+    _notify_for_post(post_id)
+    return result
 
 
 @app.delete("/posts/{post_id}", status_code=204)
@@ -160,8 +227,10 @@ def delete_single_post(post_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if post["username"] != x_username:
         raise HTTPException(status_code=403, detail="You can only delete your own posts")
+    board = post.get("board")
     if not delete_post(post_id):
         raise HTTPException(status_code=404, detail="Post not found")
+    _notify_post_subscribers(board)
     return Response(status_code=204)
 
 
@@ -222,6 +291,7 @@ def post_reaction(post_id: int, body: CreateReaction, request: Request):
     result = create_reaction(post_id, x_username, body.kind)
     if result.get("_error") == "post_not_found":
         raise HTTPException(status_code=404, detail="Post not found")
+    _notify_for_post(post_id)
     return result
 
 
@@ -248,4 +318,5 @@ def delete_user_reaction(post_id: int, username: str, request: Request):
         raise HTTPException(status_code=404, detail="Post not found")
     if not result:
         raise HTTPException(status_code=404, detail="No reactions found for this user on this post")
+    _notify_for_post(post_id)
     return Response(status_code=204)
