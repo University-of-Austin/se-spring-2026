@@ -1,0 +1,13 @@
+.mention {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+  background: rgba(79, 70, 229, 0.08);
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.mention:hover {
+  background: rgba(79, 70, 229, 0.16);
+  color: var(--color-accent-hover);
+}

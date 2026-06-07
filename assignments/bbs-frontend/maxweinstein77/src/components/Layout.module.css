@@ -1,0 +1,156 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 0.75rem;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-fg);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.brand:hover {
+  color: var(--color-accent);
+}
+
+.brandIcon {
+  font-size: 1.1rem;
+  display: inline-block;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.link, .activeLink {
+  color: var(--color-muted);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.activeLink {
+  color: var(--color-fg);
+  border-bottom-color: var(--color-accent);
+}
+
+.link:hover {
+  color: var(--color-fg);
+}
+
+.identity {
+  color: var(--color-muted);
+}
+
+.identity strong {
+  color: var(--color-fg);
+  font-weight: 600;
+}
+
+.switchBtn {
+  font-size: 0.8rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  padding: 0.25rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.switchBtn:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg);
+}
+
+.signInLink {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.signInLink:hover {
+  text-decoration: underline;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.main {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.helpFab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.helpFab:hover {
+  color: var(--color-fg);
+  border-color: var(--color-fg);
+  transform: translateY(-1px);
+}
+
+.helpFab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+  .right {
+    gap: 0.75rem;
+  }
+  .identity {
+    display: none;  /* save space on mobile; user still has sign-out btn */
+  }
+  .main {
+    padding: 1rem;
+  }
+}

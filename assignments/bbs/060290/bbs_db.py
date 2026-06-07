@@ -15,7 +15,6 @@ def show_welcome():
 
 
 init_db()
-show_welcome()
 
 
 def post(username, message):
@@ -126,6 +125,7 @@ if __name__ == "__main__":
             sys.exit(1)
         post(sys.argv[2], " ".join(sys.argv[3:]))
     elif command == "read":
+        show_welcome()
         read()
     elif command == "users":
         users()
