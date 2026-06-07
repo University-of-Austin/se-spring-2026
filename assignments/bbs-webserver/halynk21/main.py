@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Literal, get_args
 
 from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +31,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Added for A4 frontend: allow the Vite dev server origin to call this API.
+# X-Username is the only custom header the frontend sends; "*" covers it.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
