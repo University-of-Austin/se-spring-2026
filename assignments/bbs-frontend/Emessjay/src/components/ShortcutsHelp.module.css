@@ -1,0 +1,94 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 4, 24, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.dialog {
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border-bright);
+  border-radius: var(--radius);
+  max-width: 440px;
+  width: 100%;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(255, 46, 154, 0.3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  text-shadow: var(--glow-purple);
+}
+
+.close {
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+
+.close:hover {
+  color: var(--color-text);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.table td {
+  padding: var(--space-2) var(--space-4);
+  vertical-align: middle;
+}
+
+.table tr:not(:last-child) td {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.keysCell {
+  white-space: nowrap;
+  width: 1%;
+  color: var(--color-muted);
+}
+
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--color-border-bright);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-accent-2);
+  font: inherit;
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 0.85em;
+  min-width: 1.5em;
+  text-align: center;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.55);
+}
+
+.then {
+  font-size: 0.85em;
+}

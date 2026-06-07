@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}BBS — /{{ board_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> /{{ board_name }}
+</div>
+
+<div class="sort-tabs">
+  <a href="/board/{{ board_name }}" class="sort-tab {% if sort == 'default' %}active{% endif %}">chronological</a>
+  <a href="/board/{{ board_name }}?sort=new" class="sort-tab {% if sort == 'new' %}active{% endif %}">newest</a>
+  <a href="/board/{{ board_name }}?sort=hot" class="sort-tab {% if sort == 'hot' %}active{% endif %}">hot</a>
+  <a href="/board/{{ board_name }}?sort=top" class="sort-tab {% if sort == 'top' %}active{% endif %}">top</a>
+</div>
+
+{% if user %}
+<div class="new-post-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.textContent = this.textContent.includes('+') ? '- close' : '+ new post'">+ new post</div>
+<div class="new-post-form card">
+  <form action="/post" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="board" value="{{ board_name }}">
+    <div class="form-group">
+      <label class="form-label">Message</label>
+      <textarea name="message" class="form-textarea" rows="3" placeholder="Write something..." required></textarea>
+    </div>
+    <div class="flex gap-1 items-center">
+      <input type="file" name="attachment" class="form-input" style="padding:0.35rem;flex:1">
+      <input type="datetime-local" name="scheduled_at" class="form-input" style="flex:1" placeholder="Schedule">
+      <button type="submit" class="btn">Post</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% macro render_post(post, depth=0) %}
+<div class="{% if depth == 0 %}card {% endif %}post-card {% if post.is_pinned %}pinned{% endif %}" {% if depth > 0 %}style="margin-top:0.5rem"{% endif %}>
+  <div class="post-header">
+    <span class="post-id">#{{ post.id }}</span>
+    <a href="/profile/{{ post.username }}" class="post-username">{{ post.username }}</a>
+    <span class="post-meta">{{ post.timestamp|timeago }}</span>
+    {% if post.is_locked %}<span class="post-meta text-red">LOCKED</span>{% endif %}
+  </div>
+  <div class="post-body">{{ post.message|markdown }}</div>
+  <div class="post-actions">
+    {% if user %}
+    <form action="/vote/{{ post.id }}" method="post"><input type="hidden" name="value" value="1"><button type="submit" class="action-btn">&#9650;</button></form>
+    {% endif %}
+    <span class="vote-score {% if post.vote_score > 0 %}positive{% elif post.vote_score < 0 %}negative{% endif %}">{{ post.vote_score or 0 }}</span>
+    {% if user %}
+    <form action="/vote/{{ post.id }}" method="post"><input type="hidden" name="value" value="-1"><button type="submit" class="action-btn down">&#9660;</button></form>
+    {% endif %}
+    <a href="/thread/{{ post.id }}" class="action-btn">thread</a>
+    {% if post.reactions %}
+    <div class="reaction-badges">{% for r in post.reactions %}<span class="reaction-badge">{{ r }}</span>{% endfor %}</div>
+    {% endif %}
+    {% if user %}
+    <form action="/react/{{ post.id }}" method="post" style="margin-left:auto" class="flex gap-1">
+      <input type="text" name="emoji" class="form-input" style="width:50px;padding:2px 4px;font-size:0.7rem" placeholder="react">
+      <button type="submit" class="action-btn">+</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% if children.get(post.id) %}
+<div class="reply-thread">
+  {% for child in children[post.id] %}
+    {{ render_post(child, depth + 1) }}
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% for post in roots %}
+  {{ render_post(post) }}
+{% endfor %}
+
+{% if not roots %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">No posts in /{{ board_name }} yet.</span>
+</div>
+{% endif %}
+{% endblock %}

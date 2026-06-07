@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}BBS — Thread #{{ post.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> Thread in <a href="/board/{{ post.board }}">/{{ post.board }}</a>
+</div>
+
+{% macro render_reply(p, depth=0) %}
+<div class="{% if depth == 0 %}card {% endif %}post-card {% if p.is_pinned %}pinned{% endif %}" {% if depth > 0 %}style="margin-top:0.5rem"{% endif %}>
+  <div class="post-header">
+    <span class="post-id">#{{ p.id }}</span>
+    <a href="/profile/{{ p.username }}" class="post-username">{{ p.username }}</a>
+    <span class="post-meta">{{ p.timestamp|format_ts }}</span>
+    <span class="post-meta">({{ p.timestamp|timeago }})</span>
+    {% if p.is_locked %}<span class="post-meta text-red">LOCKED</span>{% endif %}
+  </div>
+  <div class="post-body">{{ p.message|markdown }}</div>
+
+  {% if attachments and p.id == post.id %}
+  <div class="mt-1">
+    {% for att in attachments %}
+      {% if att.content_type and att.content_type.startswith('image/') %}
+        <img src="{{ att.filepath }}" alt="{{ att.filename }}" class="attachment-img">
+      {% else %}
+        <a href="{{ att.filepath }}" class="attachment-link" download>&#128206; {{ att.filename }}</a>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="post-actions">
+    {% if user %}
+    <form action="/vote/{{ p.id }}" method="post"><input type="hidden" name="value" value="1"><button type="submit" class="action-btn">&#9650;</button></form>
+    {% endif %}
+    <span class="vote-score {% if p.vote_score > 0 %}positive{% elif p.vote_score < 0 %}negative{% endif %}">{{ p.vote_score or 0 }}</span>
+    {% if user %}
+    <form action="/vote/{{ p.id }}" method="post"><input type="hidden" name="value" value="-1"><button type="submit" class="action-btn down">&#9660;</button></form>
+    {% endif %}
+    {% if p.reactions %}
+    <div class="reaction-badges">{% for r in p.reactions %}<span class="reaction-badge">{{ r }}</span>{% endfor %}</div>
+    {% endif %}
+    {% if user %}
+    <form action="/react/{{ p.id }}" method="post" class="flex gap-1">
+      <input type="text" name="emoji" class="form-input" style="width:50px;padding:2px 4px;font-size:0.7rem" placeholder="react">
+      <button type="submit" class="action-btn">+</button>
+    </form>
+    <form action="/pin/{{ p.id }}" method="post"><button type="submit" class="action-btn">{% if p.is_pinned %}unpin{% else %}pin{% endif %}</button></form>
+    {% endif %}
+  </div>
+
+  {% if user and not p.is_locked %}
+  <form action="/reply/{{ p.id }}" method="post" class="mt-1">
+    <div class="flex gap-1">
+      <input type="text" name="message" class="form-input" style="flex:1" placeholder="Reply to {{ p.username }}...">
+      <button type="submit" class="btn btn-sm">Reply</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+{% if children.get(p.id) %}
+<div class="reply-thread">
+  {% for child in children[p.id] %}
+    {{ render_reply(child, depth + 1) }}
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ render_reply(post) }}
+{% endblock %}
