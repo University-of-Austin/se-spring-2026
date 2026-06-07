@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}BBS — Inbox{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> INBOX
+</div>
+
+<div class="card mb-2">
+  <form action="/dm" method="post">
+    <div class="flex gap-1 mb-1">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <label class="form-label">To</label>
+        <select name="recipient" class="form-select" required>
+          <option value="">Select user...</option>
+          {% for u in all_users %}
+            {% if u.username != user.username %}
+            <option value="{{ u.username }}">{{ u.username }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="flex:3;margin-bottom:0">
+        <label class="form-label">Message</label>
+        <input type="text" name="body" class="form-input" placeholder="Write a private message..." required>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-sm">Send DM</button>
+  </form>
+</div>
+
+<div class="page-header" style="font-size:1rem">
+  Received
+</div>
+
+{% for m in messages %}
+<div class="card dm-card {% if not m.is_read %}dm-new{% endif %}">
+  <div style="min-width:3rem">
+    {% if not m.is_read %}<span class="dm-tag">NEW</span>{% endif %}
+  </div>
+  <div class="dm-body">
+    <div class="flex gap-1 items-center mb-1">
+      <a href="/profile/{{ m.sender }}" class="post-username">{{ m.sender }}</a>
+      <span class="post-meta">{{ m.timestamp|timeago }}</span>
+    </div>
+    {{ m.body }}
+  </div>
+</div>
+{% endfor %}
+
+{% if not messages %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">No messages yet.</span>
+</div>
+{% endif %}
+
+<div class="page-header mt-2" style="font-size:1rem">
+  Sent
+</div>
+
+{% for m in sent %}
+<div class="card dm-card">
+  <div class="dm-body">
+    <div class="flex gap-1 items-center mb-1">
+      <span class="post-meta">To:</span>
+      <a href="/profile/{{ m.recipient }}" class="post-username">{{ m.recipient }}</a>
+      <span class="post-meta">{{ m.timestamp|timeago }}</span>
+    </div>
+    {{ m.body }}
+  </div>
+</div>
+{% endfor %}
+
+{% if not sent %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">No sent messages.</span>
+</div>
+{% endif %}
+{% endblock %}

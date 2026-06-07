@@ -1,0 +1,7 @@
+sqlalchemy
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+markdown
+pygments

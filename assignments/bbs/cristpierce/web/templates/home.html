@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}BBS Bustin' — Home{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <span class="accent">&gt;</span> BOARDS
+</div>
+
+<div class="board-grid">
+  {% for b in boards %}
+  <a href="/board/{{ b.name }}" class="card board-card">
+    <div class="board-name">/{{ b.name }}</div>
+    <div class="board-count">{{ b.post_count }} posts</div>
+  </a>
+  {% endfor %}
+  {% if not boards %}
+  <div class="card" style="grid-column: 1/-1; text-align:center;">
+    <span class="text-dim mono">No boards yet. Be the first to post!</span>
+  </div>
+  {% endif %}
+</div>
+
+{% if user %}
+<div class="new-post-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.textContent = this.textContent.includes('+') ? '- close' : '+ new post'">+ new post</div>
+<div class="new-post-form card">
+  <form action="/post" method="post" enctype="multipart/form-data">
+    <div class="flex gap-1 mb-1">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Board</label>
+        <input type="text" name="board" class="form-input" placeholder="general" required>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Schedule (optional)</label>
+        <input type="datetime-local" name="scheduled_at" class="form-input">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Message (markdown supported)</label>
+      <textarea name="message" class="form-textarea" rows="3" placeholder="What's on your mind?" required></textarea>
+    </div>
+    <div class="flex gap-1 items-center">
+      <div class="form-group" style="flex:1;margin-bottom:0">
+        <input type="file" name="attachment" class="form-input" style="padding:0.35rem">
+      </div>
+      <button type="submit" class="btn">Post</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="page-header">
+  <span class="accent">&gt;</span> RECENT POSTS
+</div>
+
+{% for post in recent %}
+<div class="card post-card {% if post.is_pinned %}pinned{% endif %}">
+  <div class="post-header">
+    <span class="post-id">#{{ post.id }}</span>
+    <a href="/profile/{{ post.username }}" class="post-username">{{ post.username }}</a>
+    <a href="/board/{{ post.board }}" class="post-board-tag">/{{ post.board }}</a>
+    <span class="post-meta">{{ post.timestamp|timeago }}</span>
+  </div>
+  <div class="post-body">{{ post.message|markdown }}</div>
+  <div class="post-actions">
+    {% if user %}
+    <form action="/vote/{{ post.id }}" method="post">
+      <input type="hidden" name="value" value="1">
+      <button type="submit" class="action-btn">&#9650;</button>
+    </form>
+    {% endif %}
+    <span class="vote-score {% if post.vote_score > 0 %}positive{% elif post.vote_score < 0 %}negative{% endif %}">
+      {{ post.vote_score or 0 }}
+    </span>
+    {% if user %}
+    <form action="/vote/{{ post.id }}" method="post">
+      <input type="hidden" name="value" value="-1">
+      <button type="submit" class="action-btn down">&#9660;</button>
+    </form>
+    {% endif %}
+    <a href="/thread/{{ post.id }}" class="action-btn">reply</a>
+    {% if post.reactions %}
+    <div class="reaction-badges">
+      {% for r in post.reactions %}
+      <span class="reaction-badge">{{ r }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if user %}
+    <form action="/react/{{ post.id }}" method="post" class="flex gap-1" style="margin-left:auto">
+      <input type="text" name="emoji" class="form-input" style="width:60px;padding:2px 6px;font-size:0.7rem" placeholder="emoji">
+      <button type="submit" class="action-btn">+react</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% if not recent %}
+<div class="card" style="text-align:center">
+  <span class="text-dim mono">The board is empty. Post something!</span>
+</div>
+{% endif %}
+{% endblock %}

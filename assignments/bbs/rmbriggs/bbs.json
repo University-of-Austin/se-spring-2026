@@ -1,0 +1,32 @@
+[
+  {
+    "username": "alice",
+    "message": "Hello, is anyone out there?",
+    "timestamp": "2026-04-09T15:08:51"
+  },
+  {
+    "username": "bob",
+    "message": "Hey Alice! Welcome to the board.",
+    "timestamp": "2026-04-09T15:08:51"
+  },
+  {
+    "username": "alice",
+    "message": "Thanks for the warm welcome!",
+    "timestamp": "2026-04-09T15:08:51"
+  },
+  {
+    "username": "carol",
+    "message": "Message with \"quotes\" inside",
+    "timestamp": "2026-04-09T15:08:51"
+  },
+  {
+    "username": "alice",
+    "message": "Hello world",
+    "timestamp": "2026-04-13T17:27:27"
+  },
+  {
+    "username": "bob",
+    "message": "Hi Alice!",
+    "timestamp": "2026-04-13T17:27:37"
+  }
+]
