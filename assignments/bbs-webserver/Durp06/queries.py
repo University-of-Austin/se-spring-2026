@@ -159,7 +159,7 @@ def list_posts(conn, *, q=None, username=None, limit=50, offset=0, after_id=None
                 FROM posts p JOIN users u ON p.user_id = u.id
                 WHERE (:username IS NULL OR u.username = :username)
                 AND (:q IS NULL OR p.message LIKE :q)
-                ORDER BY p.id ASC
+                ORDER BY p.id DESC
                 LIMIT :limit OFFSET :offset
             """),
             {"username": username, "q": q_param, "limit": limit, "offset": offset},
@@ -207,7 +207,7 @@ def list_user_posts(conn, username: str) -> list[dict] | None:
             SELECT p.id, u.username, p.message, p.created_at, p.updated_at
             FROM posts p JOIN users u ON p.user_id = u.id
             WHERE u.username = :username
-            ORDER BY p.id ASC
+            ORDER BY p.id DESC
         """),
         {"username": username},
     ).mappings().fetchall()
