@@ -1,0 +1,66 @@
+/* Design tokens. Single source of truth for colors, type scale, spacing.
+   CSS Modules elsewhere reference these via var(--name). Dark theme. */
+
+:root {
+  /* Surfaces (dark) */
+  --color-bg: #0f0f10;
+  --color-surface: #1a1a1d;
+  --color-surface-hover: #232328;
+  --color-border: #2a2a30;
+
+  /* Text */
+  --color-fg: #f5f5f7;
+  --color-muted: #8e8e93;
+
+  /* Accent (links, buttons) */
+  --color-accent: #f97316;        /* substack-orange-ish */
+  --color-accent-hover: #ea580c;
+  --color-accent-soft: rgba(249, 115, 22, 0.12);
+
+  /* Danger (errors) */
+  --color-danger-bg: #2a1518;
+  --color-danger-border: #7f1d1d;
+  --color-danger-fg: #fca5a5;
+
+  /* Type */
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  color-scheme: dark;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+h1, h2, h3 {
+  margin: 0 0 0.5rem;
+  line-height: 1.25;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+button {
+  font: inherit;
+}
+
+input, textarea, button {
+  font-family: inherit;
+}

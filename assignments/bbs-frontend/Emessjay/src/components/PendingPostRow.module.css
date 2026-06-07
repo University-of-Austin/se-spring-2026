@@ -1,0 +1,106 @@
+.row {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  transition: opacity 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.pending {
+  opacity: 0.55;
+}
+
+/* The brief crossover after a successful post — the entry glows
+   green for ~1.5s before being removed and replaced by the real
+   server entry. */
+.confirmed {
+  opacity: 1;
+  background: color-mix(in srgb, var(--color-accent-2) 8%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-accent-2);
+}
+
+.failed {
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.message {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.user {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.dot {
+  color: var(--color-muted);
+}
+
+.statusText {
+  font-style: italic;
+}
+
+.statusError {
+  color: var(--color-danger-text);
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(255, 94, 58, 0.55);
+}
+
+.failedDetails {
+  margin-top: var(--space-2);
+}
+
+.errorDetail {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-text);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.retry,
+.dismiss {
+  background: transparent;
+  border: 1px solid var(--color-border-bright);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.retry {
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-2);
+}
+
+.retry:hover {
+  background: var(--color-accent-2);
+  color: var(--color-bg);
+  box-shadow: var(--glow-green);
+}
+
+.dismiss:hover {
+  background: var(--color-bg-hover);
+}

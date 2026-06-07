@@ -53,6 +53,7 @@ def init_db() -> None:
                 user_id INTEGER NOT NULL,
                 board_id INTEGER NOT NULL,
                 message TEXT NOT NULL,
+                image TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id),
@@ -67,12 +68,29 @@ def init_db() -> None:
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender_id INTEGER NOT NULL,
+                recipient_id INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                read_at TEXT,
+                FOREIGN KEY (sender_id) REFERENCES users(id),
+                FOREIGN KEY (recipient_id) REFERENCES users(id)
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_messages_pair "
+            "ON messages(sender_id, recipient_id, id)"
+        ))
 
         # Best-effort migrations for older databases. SQLite throws on
         # duplicate columns; swallow and continue.
         for stmt in (
             "ALTER TABLE users ADD COLUMN password_hash TEXT",
             "ALTER TABLE posts ADD COLUMN board_id INTEGER",
+            "ALTER TABLE posts ADD COLUMN image TEXT",
         ):
             try:
                 conn.execute(text(stmt))
