@@ -8,11 +8,24 @@ This layer is responsible for:
   - Composing db helpers when an endpoint needs multiple db operations
 """
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import db
 
 app = FastAPI()
+
+# CORS: allow the A4 frontend (Vite dev server at localhost:5173) to read
+# responses from this API. Without this the browser blocks JS at port 5173
+# from seeing responses from port 8000 because they're different origins.
+# X-Username isn't a real credential, so allow_credentials stays False.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize the database on import. SQLite's CREATE TABLE IF NOT EXISTS makes
 # this safe to run every time uvicorn reloads the module.
