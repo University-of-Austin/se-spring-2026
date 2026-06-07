@@ -27,6 +27,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +35,18 @@ from sqlalchemy.exc import IntegrityError
 from db import engine, init_db
 
 app = FastAPI(title="BBS Webserver", version="2.0")
+
+# CORS for the A4 frontend (Vite dev server) and any local-tooling origin.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
