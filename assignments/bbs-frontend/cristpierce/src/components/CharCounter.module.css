@@ -1,0 +1,13 @@
+.counter {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-subtle);
+  font-family: var(--font-mono);
+}
+.near {
+  color: var(--warning);
+}
+.over {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
