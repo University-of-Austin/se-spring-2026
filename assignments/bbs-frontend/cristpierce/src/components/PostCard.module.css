@@ -1,0 +1,108 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+.card:hover {
+  border-color: var(--border-strong);
+}
+
+.sending {
+  opacity: 0.75;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.headRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+.time:hover {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.edited {
+  font-style: italic;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.message {
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.message :global(.mention) {
+  font-weight: var(--weight-medium);
+  color: var(--accent-text);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Inline edit */
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.editInput {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+  padding: var(--space-3);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+.editInput[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.editError {
+  font-size: var(--text-sm);
+  color: var(--danger-text);
+}
+.editFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.editButtons {
+  display: flex;
+  gap: var(--space-2);
+}

@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -22,6 +23,22 @@ from db import engine, init_db
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="BBS Webserver API", version="1.0.0")
+
+# CORS — added for Assignment 4 (BBS Frontend).
+# The browser treats the Vite dev server (localhost:5173) and this API
+# (localhost:8000) as different origins, so without the server explicitly
+# opting in, the browser blocks the JavaScript on the page from reading our
+# responses. The regex allows any localhost / 127.0.0.1 port (covers Vite on
+# 5173, the e2e server on 5179, etc.) so the frontend can be developed and
+# tested without code changes. allow_headers="*" is what lets the custom
+# X-Username identity header through; allow_methods="*" covers PATCH/DELETE.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 if os.path.isdir(STATIC_DIR):

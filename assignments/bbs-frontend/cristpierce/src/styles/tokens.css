@@ -1,0 +1,169 @@
+/*
+ * Design tokens — the single source of truth for the visual system.
+ *
+ * Two layers:
+ *   1. Primitives (--gray-500, --indigo-600, raw type/space scales). Theme-agnostic.
+ *   2. Semantic tokens (--bg, --surface, --text, --accent...). These are what
+ *      components consume, and they are what flips between light and dark.
+ *
+ * Theme is selected by a `data-theme="light|dark"` attribute on <html>, set by
+ * ThemeContext (which seeds from localStorage, falling back to the OS
+ * prefers-color-scheme). An inline script in index.html applies it before first
+ * paint to avoid a flash of the wrong theme.
+ */
+
+:root {
+  /* ---- Primitive palette: cool gray ramp ---- */
+  --gray-0: #ffffff;
+  --gray-25: #fcfcfd;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-150: #e9eef4;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-850: #172033;
+  --gray-900: #0f172a;
+  --gray-950: #080d1a;
+
+  /* ---- Primitive accent: indigo ---- */
+  --indigo-300: #a5b4fc;
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+
+  /* ---- Status hues ---- */
+  --red-100: #fee2e2;
+  --red-300: #fca5a5;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --red-950: #2a0e0e;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --amber-500: #f59e0b;
+
+  /* ---- Type scale (1.250 major-third-ish, tuned for UI) ---- */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code',
+    Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 0.9375rem; /* 15 — comfortable UI body */
+  --text-md: 1rem; /* 16 */
+  --text-lg: 1.125rem; /* 18 */
+  --text-xl: 1.375rem; /* 22 */
+  --text-2xl: 1.75rem; /* 28 */
+  --text-3xl: 2.25rem; /* 36 */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---- Spacing scale (4px base) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  /* ---- Motion ---- */
+  --dur-fast: 120ms;
+  --dur-med: 200ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+
+  /* ---- Layout ---- */
+  --content-width: 680px;
+  --header-height: 56px;
+
+  /* ============ Semantic tokens: LIGHT (default) ============ */
+  --bg: var(--gray-50);
+  --surface: var(--gray-0);
+  --surface-2: var(--gray-100);
+  --surface-hover: var(--gray-100);
+  --border: var(--gray-200);
+  --border-strong: var(--gray-300);
+
+  --text: var(--gray-900);
+  --text-muted: var(--gray-500);
+  --text-subtle: var(--gray-400);
+
+  --accent: var(--indigo-600);
+  --accent-hover: var(--indigo-700);
+  --accent-fg: var(--gray-0);
+  --accent-subtle: #eef2ff;
+  --accent-text: var(--indigo-700);
+
+  --danger: var(--red-600);
+  --danger-hover: #b91c1c;
+  --danger-fg: var(--gray-0);
+  --danger-subtle: var(--red-100);
+  --danger-text: var(--red-600);
+
+  --success: var(--green-600);
+  --warning: var(--amber-500);
+
+  --ring: color-mix(in srgb, var(--indigo-500) 45%, transparent);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14), 0 4px 8px rgba(15, 23, 42, 0.06);
+
+  color-scheme: light;
+}
+
+/* ============ Semantic tokens: DARK ============ */
+[data-theme='dark'] {
+  --bg: var(--gray-950);
+  --surface: var(--gray-900);
+  --surface-2: var(--gray-850);
+  --surface-hover: var(--gray-800);
+  --border: var(--gray-800);
+  --border-strong: var(--gray-700);
+
+  --text: var(--gray-100);
+  --text-muted: var(--gray-400);
+  --text-subtle: var(--gray-500);
+
+  --accent: var(--indigo-500);
+  --accent-hover: var(--indigo-400);
+  --accent-fg: var(--gray-0);
+  --accent-subtle: #1e1b4b;
+  --accent-text: var(--indigo-300);
+
+  --danger: var(--red-500);
+  --danger-hover: var(--red-600);
+  --danger-fg: var(--gray-0);
+  --danger-subtle: var(--red-950);
+  --danger-text: var(--red-300);
+
+  --ring: color-mix(in srgb, var(--indigo-400) 55%, transparent);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
